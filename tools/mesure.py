@@ -18,7 +18,7 @@ import argparse, csv, json, math, os
 from datetime import date, datetime, timedelta
 
 # ----------------------------------------------------------------- conventions (PRE-REGISTRATION §5)
-CAPITAL_INITIAL_EUR = 100_000.0
+CAPITAL_INITIAL_EUR = 120_000.0
 DATE_DEBUT = "2026-11-24"
 PFU = 0.314                      # plus-values réalisées nettes
 TAUX_MARGE_AN = 0.055            # intérêts débiteurs
@@ -555,7 +555,7 @@ def derouler(fills, prix, jusqua, declarations=None):
                                "detail": f"valorisation incomplète : {', '.join(manquants)}"})
         if capitaux < 0.2 * CAPITAL_INITIAL_EUR:
             evenements.append({"date": ds, "type": "seuil_arret",
-                               "detail": f"capitaux propres {capitaux:.0f} € < 20 000 € (§8 du pré-enregistrement)"})
+                               "detail": f"capitaux propres {capitaux:.0f} € < 24 000 € (§8 du pré-enregistrement)"})
         d += timedelta(days=1)
     return lignes, evenements
 

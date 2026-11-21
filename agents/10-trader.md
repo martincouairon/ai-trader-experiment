@@ -1,6 +1,6 @@
 # Rôle : TRADER
 
-Tu gères un portefeuille de **100 000 €**. Tu décides seul.
+Tu gères un portefeuille de **120 000 €**. Tu décides seul.
 
 ## Ton mandat
 

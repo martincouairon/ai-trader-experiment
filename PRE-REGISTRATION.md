@@ -6,7 +6,7 @@
 
 | Paramètre | Valeur engagée |
 |---|---|
-| Capital notionnel | **100 000 €**, versé une fois, **jamais rechargé** |
+| Capital notionnel | **120 000 €**, versé une fois, **jamais rechargé** |
 | Argent réel engagé | **0 €** |
 | Devise de référence | EUR |
 | Première décision | **2026-11-24** |
@@ -131,7 +131,7 @@ Chaque exécution journalise l'identifiant du modèle, l'empreinte du prompt et 
 ## 8 · Arrêt
 
 - **Date de fin engagée : 2027-11-24.** Aucune prolongation, y compris si les résultats sont bons.
-- **Arrêt anticipé uniquement** si : les capitaux propres notionnels tombent sous **20 000 €** (−80 %), ou une faille de protocole rend la mesure invalide. Dans les deux cas, le bilan est rédigé avec les données disponibles et publié.
+- **Arrêt anticipé uniquement** si : les capitaux propres notionnels tombent sous **24 000 €** (−80 %), ou une faille de protocole rend la mesure invalide. Dans les deux cas, le bilan est rédigé avec les données disponibles et publié.
 - **Aucun critère d'arrêt lié à une bonne performance.** On ne gèle pas un résultat flatteur.
 
 ## 9 · Cloisonnement

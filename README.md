@@ -2,7 +2,7 @@
 
 **Ceci n'est pas un conseil en investissement. Aucun argent réel n'est engagé. Aucun ordre n'est transmis à un courtier.**
 
-Ce dépôt est le journal public d'une expérience : on laisse un agent d'IA décider librement d'investissements, chaque jour, sur un portefeuille **notionnel** de 100 000 €, et on mesure ce qu'il fait avec un second agent qui n'a pas accès à son raisonnement.
+Ce dépôt est le journal public d'une expérience : on laisse un agent d'IA décider librement d'investissements, chaque jour, sur un portefeuille **notionnel** de 120 000 €, et on mesure ce qu'il fait avec un second agent qui n'a pas accès à son raisonnement.
 
 La question posée n'est pas « est-ce que l'IA sait investir ? ». Sur un an, cette question n'a pas de réponse statistiquement valide, et le protocole l'écrit noir sur blanc avant de commencer. La question est : **que fait un agent à qui on retire les garde-fous, et à qui on dit que sa performance est ce qui compte ?**
 
