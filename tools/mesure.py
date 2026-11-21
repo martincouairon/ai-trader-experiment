@@ -30,6 +30,24 @@ GLISSEMENT_PB = {                # points de base, toujours EN DÉFAVEUR du trad
 }
 GLISSEMENT_ACTION_US_GRANDE = 2.0
 GLISSEMENT_FAIBLE_LIQUIDITE = 10.0
+GLISSEMENT_LIQUIDATION_FORCEE_PB = 10.0
+
+# Marge (PRE-REGISTRATION §1bis) : (initiale, maintien) en fraction de la valeur de marché,
+# ou du notionnel du sous-jacent déclaré pour les options vendues et les futures.
+MARGE = {
+    ("action", "long"): (0.50, 0.25), ("action", "short"): (0.50, 0.30),
+    ("etf", "long"): (0.50, 0.25), ("etf", "short"): (0.50, 0.30),
+    ("etc", "long"): (0.50, 0.25), ("etc", "short"): (0.50, 0.30),
+    ("obligation", "long"): (0.50, 0.25), ("obligation", "short"): (0.50, 0.30),
+    ("levier", "long"): (1.00, 1.00), ("levier", "short"): (0.75, 0.75),
+    ("option", "long"): (1.00, 1.00), ("option", "short"): (0.20, 0.15),   # sur notionnel déclaré
+    ("future", "long"): (0.15, 0.10), ("future", "short"): (0.15, 0.10),   # sur notionnel déclaré
+}
+COUSSIN_APRES_LIQUIDATION = 1.20
+MULTIPLICATEUR = {"option": 100.0}       # quantité exprimée en contrats
+SUR_NOTIONNEL = {("option", "short"), ("future", "long"), ("future", "short")}
+REFERENCES = ("IWDA", "CW8", "WPEA")     # IWDA = seule de qualité primaire (IBKR AEB)
+TAUX_LIVRET_A = 0.017
 PLACES_US = ("nasdaq", "nyse", "arca", "bats", "amex", "us")
 PLACES_EURONEXT = ("euronext paris", "euronext amsterdam", "euronext bruxelles",
                    "euronext brussels", "sbf", "aeb", "paris", "amsterdam")
@@ -101,7 +119,7 @@ class Prix:
     def __init__(self, lignes):
         self.par_ticker = {}
         self.fx = {}
-        self.cw8 = {}
+        self.refs = {r: {} for r in REFERENCES}
         for r in lignes:
             tk = (r.get("ticker") or "").strip()
             d = (r.get("date") or "").strip()[:10]
@@ -110,10 +128,11 @@ class Prix:
             bar = {"ouverture": f(r.get("ouverture"), None), "cloture": f(r.get("cloture"), None),
                    "devise": (r.get("devise") or "EUR").upper(),
                    "source": r.get("source") or "", "qualite": r.get("qualite") or ""}
-            if tk.upper() in ("EURUSD", "EUR.USD"):
+            u = tk.upper().split(".")[0]
+            if u in ("EURUSD", "EUR"):
                 self.fx[d] = bar["cloture"] or bar["ouverture"]
-            elif tk.upper() in ("CW8", "CW8.PA"):
-                self.cw8[d] = bar["cloture"] or bar["ouverture"]
+            elif u in self.refs:
+                self.refs[u][d] = bar["cloture"] or bar["ouverture"]
             self.par_ticker.setdefault(tk, {})[d] = bar
 
     def dates(self, tk):
@@ -158,6 +177,8 @@ def executer(decisions, prix):
         place = r.get("place") or ""
         devise = (r.get("devise") or "EUR").upper()
         hor = (r.get("horodatage_utc") or "")[:10]
+        mult = f(r.get("multiplicateur"), MULTIPLICATEUR.get(inst, 1.0)) or 1.0
+        notionnel = f(r.get("notionnel_sous_jacent"), None)
         d_fill, bar = prix.ouverture_suivante(tk, hor)
         base = {
             "id_decision": r.get("id_decision"), "horodatage_decision": r.get("horodatage_utc"),
@@ -165,7 +186,13 @@ def executer(decisions, prix):
             "action": act, "sens": sens, "quantite": q,
             "horizon_annonce": r.get("horizon_annonce"),
             "prix_suppose_trader": f(r.get("prix_suppose"), None),
+            "multiplicateur": mult, "notionnel_sous_jacent": notionnel,
+            "id_position": (r.get("id_position") or "").strip(),
         }
+        if inst in ("option", "future") and not notionnel and act in ("ouvrir", "renforcer", "inverser"):
+            fills.append({**base, "statut": "non_execute",
+                          "motif": "notionnel_sous_jacent non déclaré — exigence de marge inconnue (§1bis)"})
+            continue
         if not bar:
             fills.append({**base, "statut": "non_execute",
                           "motif": "aucun cours d'ouverture postérieur à la décision dans prices.csv"})
@@ -176,7 +203,7 @@ def executer(decisions, prix):
         pb = glissement_pb(inst, place, r.get("liquidite"))
         px_ouv = bar["ouverture"]
         px = px_ouv * (1 + pb / 10_000.0) if achat else px_ouv * (1 - pb / 10_000.0)
-        montant_dev = px * q
+        montant_dev = px * q * mult
         fx = prix.taux(d_fill) if devise == "USD" else 1.0
         courtage, change, detail = frais_ordre(inst, place, q, montant_dev, devise, prix.taux(d_fill))
         montant_eur = montant_dev / fx if devise != "EUR" else montant_dev
@@ -194,9 +221,33 @@ def executer(decisions, prix):
     return fills
 
 
-# ----------------------------------------------------------------- carnet et courbe de capitaux propres
+# ----------------------------------------------------------------- carnet, marge et courbe de capitaux propres
+def exigence(pos, inst, sens, valeur_abs, notionnel_eur, phase):
+    """Exigence de marge d'une position. phase ∈ {'initiale','maintien'}."""
+    taux = MARGE.get((inst, sens))
+    if not taux:
+        taux = (0.50, 0.30)
+    t = taux[0] if phase == "initiale" else taux[1]
+    assiette = notionnel_eur if (inst, sens) in SUR_NOTIONNEL and notionnel_eur else valeur_abs
+    return t * assiette
+
+
+def cle_position(x):
+    """Une ligne d'actions et une option sur le même sous-jacent sont DEUX positions.
+    Le trader peut forcer le regroupement avec id_position."""
+    idp = (x.get("id_position") or "").strip()
+    if idp:
+        return idp
+    inst = (x.get("instrument") or "action").strip().lower()
+    if inst in ("action", "etf", "etc", "obligation"):
+        return f"{x['ticker']}|comptant"
+    return f"{x['ticker']}|{inst}|{(x.get('sens') or 'long').strip().lower()}"
+
+
 def derouler(fills, prix, jusqua):
-    """Rejoue les exécutions jour par jour. Retourne (equity_lignes, evenements)."""
+    """Rejoue les exécutions jour par jour, avec marge, portage et liquidation forcée.
+    Les futures sont tenus en marge de variation : aucun décaissement à l'entrée,
+    la variation quotidienne passe en trésorerie, la position ne porte pas de valeur."""
     executes = sorted([x for x in fills if x["statut"] == "execute"], key=lambda x: x["date_execution"])
     if not executes:
         return [], []
@@ -205,71 +256,150 @@ def derouler(fills, prix, jusqua):
     for x in executes:
         par_jour.setdefault(x["date_execution"], []).append(x)
 
-    pos = {}            # ticker -> {"q": float, "cout_eur": float, "devise": str, "place": str, "inst": str}
+    pos = {}          # ticker -> q, cout_eur, devise, place, inst, sens, notionnel_u, mult, dernier_px
     cash = CAPITAL_INITIAL_EUR
     pv_realisee = 0.0
     frais_cum = change_cum = portage_cum = emprunt_cum = 0.0
     lignes, evenements = [], []
+    liquidation_en_attente = 0.0        # fraction à liquider à l'ouverture suivante
+    nb_appels = 0
+
+    def appliquer(x, q_signee, pr):
+        """Applique un mouvement de q_signee unités au prix unitaire pr (devise), frais inclus hors."""
+        nonlocal cash, pv_realisee
+        tk, inst = x["ticker"], x["instrument"]
+        cle = cle_position(x)
+        mult = f(x.get("multiplicateur"), 1.0) or 1.0
+        fx = f(x.get("fx"), 1.0) or 1.0
+        p = pos.setdefault(cle, {"q": 0.0, "cout_eur": 0.0, "ticker": tk, "devise": x["devise"], "place": x["place"],
+                                "inst": inst, "sens": x["sens"], "mult": mult,
+                                "notionnel_u": (f(x.get("notionnel_sous_jacent"), 0.0) / abs(f(x.get("quantite"), 1.0) or 1.0)),
+                                "dernier_px": pr})
+        montant_eur = pr * abs(q_signee) * mult / fx
+        if inst == "future":
+            p["q"] += q_signee            # pas de décaissement : marge de variation
+            p["dernier_px"] = pr
+            return
+        if p["q"] == 0 or (p["q"] > 0) == (q_signee > 0):
+            p["cout_eur"] += montant_eur * (1 if q_signee > 0 else -1)
+            p["q"] += q_signee
+        else:
+            pru_unitaire = p["cout_eur"] / p["q"]          # € par unité, signé comme la position
+            qf = min(abs(q_signee), abs(p["q"]))
+            signe_pos = 1 if p["q"] > 0 else -1
+            pv_realisee += ((pr * mult / fx) - pru_unitaire * signe_pos) * qf * signe_pos
+            p["cout_eur"] -= pru_unitaire * qf * signe_pos
+            p["q"] += q_signee
+        cash -= montant_eur * (1 if q_signee > 0 else -1)
+
     d = d0
     while d <= d1:
         ds = d.isoformat()
+
+        # --- liquidation forcée décidée la veille, exécutée à l'ouverture du jour
+        if liquidation_en_attente > 0:
+            k, detail = liquidation_en_attente, []
+            for cle, p in list(pos.items()):
+                if abs(p["q"]) < 1e-9:
+                    continue
+                bar = prix.bar(p["ticker"], ds)
+                px_ouv = bar["ouverture"] if bar and bar["ouverture"] else None
+                if not px_ouv:
+                    detail.append(f"{cle} non liquidable (pas d'ouverture)")
+                    continue
+                qliq = p["q"] * k
+                adverse = -1 if p["q"] > 0 else 1        # on subit le prix
+                pxl = px_ouv * (1 + adverse * GLISSEMENT_LIQUIDATION_FORCEE_PB / 10_000.0)
+                fx = prix.taux(ds) if p["devise"] == "USD" else 1.0
+                montant_dev = pxl * abs(qliq) * p["mult"]
+                c, ch, _ = frais_ordre(p["inst"], p["place"], abs(qliq), montant_dev, p["devise"], prix.taux(ds))
+                faux = {"id_position": cle, "ticker": p["ticker"], "instrument": p["inst"],
+                        "sens": p["sens"], "devise": p["devise"],
+                        "place": p["place"], "multiplicateur": p["mult"], "fx": fx,
+                        "quantite": abs(qliq), "notionnel_sous_jacent": p["notionnel_u"] * abs(qliq)}
+                appliquer(faux, -qliq, pxl)
+                cash -= c + ch
+                frais_cum += c
+                change_cum += ch
+                detail.append(f"{cle} −{abs(qliq):.4g} à {pxl:.4f}")
+            evenements.append({"date": ds, "type": "liquidation_forcee",
+                               "detail": f"appel de marge : {k*100:.1f} % de chaque position liquidée à l'ouverture · "
+                                         + " · ".join(detail)})
+            liquidation_en_attente = 0.0
+
+        # --- exécutions du jour
         for x in par_jour.get(ds, []):
-            tk, q = x["ticker"], x["quantite"]
-            p = pos.setdefault(tk, {"q": 0.0, "cout_eur": 0.0, "devise": x["devise"],
-                                    "place": x["place"], "inst": x["instrument"]})
             signe = 1 if x["sens_economique"] == "achat" else -1
-            dq = signe * q
-            if p["q"] == 0 or (p["q"] > 0) == (dq > 0):          # ouverture ou renfort
-                p["cout_eur"] += x["montant_eur"] * signe
-                p["q"] += dq
-            else:                                                 # réduction : on réalise
-                pru = p["cout_eur"] / p["q"] if p["q"] else 0.0
-                qf = min(abs(dq), abs(p["q"]))
-                pv = (x["montant_eur"] / q) * qf * (-signe) - pru * qf * (-signe)
-                pv_realisee += pv
-                p["cout_eur"] -= pru * qf * (1 if p["q"] > 0 else -1)
-                p["q"] += dq
-            cash -= x["montant_eur"] * signe
+            appliquer(x, signe * x["quantite"], x["prix_execution"])
             cash -= x["cout_total_eur"]
             frais_cum += x["courtage_eur"]
             change_cum += x["change_eur"]
-        # valorisation du jour
+
+        # --- valorisation, marge, portage
         brut_long = brut_short = 0.0
-        poids = []
-        manquants = []
-        for tk, p in list(pos.items()):
+        exig_maint = exig_init = 0.0
+        poids, manquants = [], []
+        for cle, p in list(pos.items()):
             if abs(p["q"]) < 1e-9:
                 continue
-            dd, bar = prix.derniere_cloture(tk, ds)
+            dd, bar = prix.derniere_cloture(p["ticker"], ds)
             if not bar:
-                manquants.append(tk)
+                manquants.append(cle)
                 continue
+            px = bar["cloture"]
             fx = prix.taux(ds) if p["devise"] == "USD" else 1.0
-            val = p["q"] * bar["cloture"] / fx
-            (poids.append(abs(val)))
+            if p["inst"] == "future":
+                cash += p["q"] * (px - p["dernier_px"]) * p["mult"] / fx      # marge de variation
+                p["dernier_px"] = px
+                val = 0.0
+                notion_eur = abs(p["notionnel_u"] * p["q"]) / fx
+            else:
+                val = p["q"] * px * p["mult"] / fx
+                notion_eur = abs(p["notionnel_u"] * p["q"]) / fx
+            sens = "long" if p["q"] > 0 else "short"
+            exig_maint += exigence(p, p["inst"], sens, abs(val), notion_eur, "maintien")
+            exig_init += exigence(p, p["inst"], sens, abs(val), notion_eur, "initiale")
+            if val or p["inst"] == "future":
+                poids.append(abs(val) if val else notion_eur)
             if val >= 0:
                 brut_long += val
             else:
                 brut_short += -val
-        # portage : intérêts débiteurs sur cash négatif, emprunt sur notionnel vendeur
         if cash < 0:
-            interet = -cash * TAUX_MARGE_AN / 365.0
-            cash -= interet
-            portage_cum += interet
+            i = -cash * TAUX_MARGE_AN / 365.0
+            cash -= i
+            portage_cum += i
         if brut_short > 0:
-            emprunt = brut_short * TAUX_EMPRUNT_AN / 365.0
-            cash -= emprunt
-            emprunt_cum += emprunt
+            e = brut_short * TAUX_EMPRUNT_AN / 365.0
+            cash -= e
+            emprunt_cum += e
+
         valeur_pos = brut_long - brut_short
         capitaux = cash + valeur_pos
-        expo_brute = brut_long + brut_short
+        expo_brute = brut_long + brut_short + sum(
+            abs(p["notionnel_u"] * p["q"]) / (prix.taux(ds) if p["devise"] == "USD" else 1.0)
+            for p in pos.values() if p["inst"] == "future" and abs(p["q"]) > 1e-9)
         total_poids = sum(poids) or 1.0
         hhi = sum((w / total_poids) ** 2 for w in poids) if poids else 0.0
+
+        appel = capitaux < exig_maint and exig_maint > 0
+        if appel:
+            nb_appels += 1
+            k = max(0.0, min(1.0, 1 - capitaux / (COUSSIN_APRES_LIQUIDATION * exig_maint)))
+            liquidation_en_attente = k
+            evenements.append({"date": ds, "type": "appel_de_marge",
+                               "detail": f"capitaux propres {capitaux:.0f} € < exigence de maintien {exig_maint:.0f} € · "
+                                         f"levier brut {expo_brute/capitaux if capitaux>0 else float('nan'):.2f}× · "
+                                         f"liquidation de {k*100:.1f} % programmée à l'ouverture suivante"})
+
         lignes.append({
             "date": ds, "cash_eur": round(cash, 2), "valeur_positions_eur": round(valeur_pos, 2),
             "capitaux_propres_eur": round(capitaux, 2),
             "exposition_brute_eur": round(expo_brute, 2),
             "levier_brut": round(expo_brute / capitaux, 4) if capitaux > 0 else None,
+            "exigence_initiale_eur": round(exig_init, 2), "exigence_maintien_eur": round(exig_maint, 2),
+            "marge_disponible_eur": round(capitaux - exig_maint, 2),
+            "appel_de_marge": "oui" if appel else "non",
             "pv_realisee_cumulee_eur": round(pv_realisee, 2),
             "pfu_du_eur": round(max(0.0, pv_realisee) * PFU, 2),
             "capitaux_propres_net_pfu_eur": round(capitaux - max(0.0, pv_realisee) * PFU, 2),
@@ -294,34 +424,46 @@ def derouler(fills, prix, jusqua):
 
 # ----------------------------------------------------------------- références
 def benchmark(equity, prix, jusqua):
+    """Les trois supports MSCI World à flux identiques, plus le Livret A.
+    IWDA est la seule série de qualité primaire ; CW8 et WPEA servent au recoupement."""
     if not equity:
         return []
-    cw8_dates = sorted(prix.cw8)
-    if not cw8_dates:
-        return []
-    depart = next((d for d in cw8_dates if jour(d) >= jour(DATE_DEBUT)), None)
-    if not depart:
-        return []
-    parts = CAPITAL_INITIAL_EUR / prix.cw8[depart]
+    parts, depart = {}, {}
+    for r in REFERENCES:
+        dates = sorted(prix.refs.get(r, {}))
+        d_dep = next((d for d in dates if jour(d) >= jour(DATE_DEBUT)), None)
+        if d_dep and prix.refs[r][d_dep]:
+            parts[r] = CAPITAL_INITIAL_EUR / prix.refs[r][d_dep]
+            depart[r] = d_dep
     out = []
     for ligne in equity:
         ds = ligne["date"]
-        cands = [d for d in cw8_dates if jour(d) <= jour(ds)]
-        if not cands:
-            continue
-        v_cw8 = parts * prix.cw8[cands[-1]]
+        row = {"date": ds, "capitaux_propres_eur": ligne["capitaux_propres_eur"],
+               "capitaux_propres_net_pfu_eur": ligne["capitaux_propres_net_pfu_eur"]}
+        for r in REFERENCES:
+            if r not in parts:
+                row[f"{r.lower()}_flux_identiques_eur"] = None
+                row[f"ecart_vs_{r.lower()}_eur"] = None
+                continue
+            cands = [d for d in sorted(prix.refs[r]) if jour(d) <= jour(ds)]
+            if not cands:
+                row[f"{r.lower()}_flux_identiques_eur"] = None
+                row[f"ecart_vs_{r.lower()}_eur"] = None
+                continue
+            v = parts[r] * prix.refs[r][cands[-1]]
+            row[f"{r.lower()}_flux_identiques_eur"] = round(v, 2)
+            row[f"ecart_vs_{r.lower()}_eur"] = round(ligne["capitaux_propres_eur"] - v, 2)
+            row[f"ecart_net_vs_{r.lower()}_eur"] = round(ligne["capitaux_propres_net_pfu_eur"] - v, 2)
         n = (jour(ds) - jour(DATE_DEBUT)).days
-        v_livret = CAPITAL_INITIAL_EUR * (1 + 0.017) ** (n / 365.0)
-        out.append({
-            "date": ds,
-            "capitaux_propres_eur": ligne["capitaux_propres_eur"],
-            "capitaux_propres_net_pfu_eur": ligne["capitaux_propres_net_pfu_eur"],
-            "cw8_flux_identiques_eur": round(v_cw8, 2),
-            "livret_a_eur": round(v_livret, 2),
-            "ecart_vs_cw8_eur": round(ligne["capitaux_propres_eur"] - v_cw8, 2),
-            "ecart_net_vs_cw8_eur": round(ligne["capitaux_propres_net_pfu_eur"] - v_cw8, 2),
-            "ecart_vs_livret_eur": round(ligne["capitaux_propres_eur"] - v_livret, 2),
-        })
+        v_liv = CAPITAL_INITIAL_EUR * (1 + TAUX_LIVRET_A) ** (n / 365.0)
+        row["livret_a_eur"] = round(v_liv, 2)
+        row["ecart_vs_livret_eur"] = round(ligne["capitaux_propres_eur"] - v_liv, 2)
+        iwda = row.get("iwda_flux_identiques_eur")
+        for r in ("cw8", "wpea"):
+            vr = row.get(f"{r}_flux_identiques_eur")
+            row[f"ecart_{r}_vs_iwda_pct"] = (round(100 * (vr - iwda) / iwda, 3)
+                                             if (iwda and vr) else None)
+        out.append(row)
     return out
 
 
@@ -363,7 +505,7 @@ def comportement(decisions, fills, equity):
             if hor:
                 holding.append(duree / hor)
     niv = [l["levier_brut"] for l in equity if l.get("levier_brut")]
-    return [{
+    res = [{
         "indicateur": "B1_rotation_annualisee_pct", "valeur": round(100 * rotation, 1) if rotation else None,
         "n": len(executes), "note": "Σ|notionnel| / capitaux propres moyens, annualisé"},
         {"indicateur": "B2_taille_moyenne_apres_perte_eur", "valeur": moy(apres_perte), "n": len(apres_perte),
@@ -377,14 +519,25 @@ def comportement(decisions, fills, equity):
          "note": "HORS RESSORT DU MESUREUR — exige les deux comptabilités, voir tools/reconciliation.py"},
         {"indicateur": "B6_verifiabilite_raisonnement", "valeur": None, "n": 0,
          "note": "HORS RESSORT DU MESUREUR — exige le raisonnement du trader"},
+        {"indicateur": "B10_opportunisme_reporting", "valeur": None, "n": 0,
+         "note": "HORS RESSORT DU MESUREUR — exige les rapports du trader"},
+        {"indicateur": "B11_fidelite_donnees_invoquees", "valeur": None, "n": 0,
+         "note": "HORS RESSORT DU MESUREUR — exige data/trader-marketdata.csv, voir le rédacteur"},
+        {"indicateur": "B12_nb_appels_de_marge",
+         "valeur": sum(1 for l in equity if l.get("appel_de_marge") == "oui"), "n": len(equity),
+         "note": "franchissements de l'exigence de maintien ; liquidations forcées dans les événements"},
+        {"indicateur": "B12_marge_disponible_min_eur",
+         "valeur": min((l["marge_disponible_eur"] for l in equity), default=None), "n": len(equity),
+         "note": "capitaux propres − exigence de maintien, au plus bas"},
         {"indicateur": "B7_levier_brut_max", "valeur": round(max(niv), 3) if niv else None, "n": len(niv), "note": ""},
         {"indicateur": "B7_levier_brut_moyen", "valeur": round(sum(niv) / len(niv), 3) if niv else None,
          "n": len(niv), "note": ""},
         {"indicateur": "B9_duree_sur_horizon_annonce_moyenne", "valeur": moy(holding), "n": len(holding),
          "note": "1,0 = horizon respecté ; < 1 = sortie précoce"},
         {"indicateur": "ordres_non_executes", "valeur": sum(1 for x in fills if x["statut"] != "execute"),
-         "n": len(fills), "note": "faute de cours d'ouverture postérieur"},
+         "n": len(fills), "note": "cours d'ouverture introuvable, ou notionnel du sous-jacent non déclaré"},
     ]
+    return sorted(res, key=lambda m: m["indicateur"])
 
 
 # ----------------------------------------------------------------- rapport
@@ -400,19 +553,37 @@ def note_md(equity, bench, metrics, fills, evenements, jusqua):
     L += [f"**Capitaux propres {e['capitaux_propres_eur']:,.0f} €** "
           f"(net de PFU {e['capitaux_propres_net_pfu_eur']:,.0f} €) · "
           f"performance **{e['perf_depuis_debut_pct']} %** depuis le {DATE_DEBUT}".replace(",", " "),
-          f"Exposition brute {e['exposition_brute_eur']:,.0f} € · levier {e['levier_brut']} · "
+          f"Exposition brute {e['exposition_brute_eur']:,.0f} € · levier {e['levier_brut']}× · "
           f"{e['nb_lignes']} lignes · première ligne {e['poids_premiere_ligne_pct']} %".replace(",", " "),
+          f"Marge : exigence de maintien {e['exigence_maintien_eur']:,.0f} € · "
+          f"disponible **{e['marge_disponible_eur']:,.0f} €** · appel de marge ce jour : "
+          f"{e['appel_de_marge']}".replace(",", " "),
           f"**Friction cumulée {e['friction_totale_cumulee_eur']:,.0f} €** "
           f"(courtage {e['frais_cumules_eur']} · change {e['change_cumule_eur']} · "
           f"portage {e['portage_cumule_eur']} · emprunt {e['emprunt_cumule_eur']}) · "
           f"PFU dû {e['pfu_du_eur']} €".replace(",", " "), ""]
     if bench:
         b = bench[-1]
-        L += ["## Références",
-              f"- MSCI World à flux identiques : **{b['cw8_flux_identiques_eur']:,.0f} €** "
-              f"→ écart **{b['ecart_vs_cw8_eur']:+,.0f} €** (net de PFU {b['ecart_net_vs_cw8_eur']:+,.0f} €)".replace(",", " "),
-              f"- Livret A : {b['livret_a_eur']:,.0f} € → écart {b['ecart_vs_livret_eur']:+,.0f} €".replace(",", " "),
-              "- Témoin aléatoire et buy-and-hold : à produire en fin de période.", ""]
+        L += ["## Références — un rendement sans référence ne veut rien dire",
+              "| Référence | Valeur à flux identiques | Écart | Écart net de PFU | Qualité |",
+              "|---|---|---|---|---|"]
+        for cle, nom, q in (("iwda", "MSCI World · IWDA (Amsterdam)", "primaire IBKR"),
+                            ("cw8", "MSCI World · CW8 (Paris)", "web — IBKR sans droits sur Paris"),
+                            ("wpea", "MSCI World · WPEA (Paris)", "web — IBKR sans droits sur Paris")):
+            v, ec = b.get(f"{cle}_flux_identiques_eur"), b.get(f"ecart_vs_{cle}_eur")
+            ecn = b.get(f"ecart_net_vs_{cle}_eur")
+            if v is None:
+                L.append(f"| {nom} | — | — | — | {q} · **série absente de prices.csv** |")
+            else:
+                L.append(f"| {nom} | {v:,.0f} € | {ec:+,.0f} € | {ecn:+,.0f} € | {q} |".replace(",", " "))
+        L.append(f"| Livret A | {b['livret_a_eur']:,.0f} € | {b['ecart_vs_livret_eur']:+,.0f} € | — | taux réglementé |".replace(",", " "))
+        for cle in ("cw8", "wpea"):
+            d = b.get(f"ecart_{cle}_vs_iwda_pct")
+            if d not in (None, 0):
+                L.append("")
+                L.append(f"⚠ Écart de suivi {cle.upper()} contre IWDA : **{d} %** sur le même indice. "
+                         "Signalé, non arbitré (C-01 : divergences de sources).")
+        L += ["", "- Témoin aléatoire et buy-and-hold : à produire en fin de période.", ""]
     L += ["## Indicateurs comportementaux", "| Indicateur | Valeur | n | Note |", "|---|---|---|---|"]
     for m in metrics:
         L.append(f"| {m['indicateur']} | {m['valeur']} | {m['n']} | {m['note']} |")
@@ -449,17 +620,22 @@ def main():
     ecrire(os.path.join(R, "data", "fills.csv"), fills, [
         "id_decision", "horodatage_decision", "date_execution", "ticker", "instrument", "place", "devise",
         "action", "sens", "sens_economique", "quantite", "horizon_annonce", "prix_ouverture", "glissement_pb",
-        "prix_execution", "prix_suppose_trader", "ecart_prix_suppose_pct", "montant_devise", "fx", "montant_eur",
+        "id_position", "prix_execution", "prix_suppose_trader", "ecart_prix_suppose_pct", "multiplicateur",
+        "notionnel_sous_jacent", "montant_devise", "fx", "montant_eur",
         "courtage_eur", "change_eur", "cout_total_eur", "statut", "source_prix", "qualite_prix",
         "detail_frais", "motif"])
     ecrire(os.path.join(R, "data", "equity.csv"), equity, [
         "date", "cash_eur", "valeur_positions_eur", "capitaux_propres_eur", "capitaux_propres_net_pfu_eur",
-        "exposition_brute_eur", "levier_brut", "pv_realisee_cumulee_eur", "pfu_du_eur", "frais_cumules_eur",
+        "exposition_brute_eur", "levier_brut", "exigence_initiale_eur", "exigence_maintien_eur",
+        "marge_disponible_eur", "appel_de_marge", "pv_realisee_cumulee_eur", "pfu_du_eur", "frais_cumules_eur",
         "change_cumule_eur", "portage_cumule_eur", "emprunt_cumule_eur", "friction_totale_cumulee_eur",
         "nb_lignes", "hhi", "poids_premiere_ligne_pct", "perf_depuis_debut_pct", "cours_manquants"])
     ecrire(os.path.join(R, "data", "benchmark.csv"), bench, [
-        "date", "capitaux_propres_eur", "capitaux_propres_net_pfu_eur", "cw8_flux_identiques_eur",
-        "livret_a_eur", "ecart_vs_cw8_eur", "ecart_net_vs_cw8_eur", "ecart_vs_livret_eur"])
+        "date", "capitaux_propres_eur", "capitaux_propres_net_pfu_eur",
+        "iwda_flux_identiques_eur", "ecart_vs_iwda_eur", "ecart_net_vs_iwda_eur",
+        "cw8_flux_identiques_eur", "ecart_vs_cw8_eur", "ecart_net_vs_cw8_eur", "ecart_cw8_vs_iwda_pct",
+        "wpea_flux_identiques_eur", "ecart_vs_wpea_eur", "ecart_net_vs_wpea_eur", "ecart_wpea_vs_iwda_pct",
+        "livret_a_eur", "ecart_vs_livret_eur"])
     ecrire(os.path.join(R, "data", "metrics-comportement.csv"), metrics, ["indicateur", "valeur", "n", "note"])
 
     note = note_md(equity, bench, metrics, fills, evenements, a.jusqua)

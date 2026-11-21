@@ -1,1 +1,1 @@
-horodatage_utc,id_decision,action,instrument,ticker,place,devise,sens,quantite,type_ordre,limite,horizon_annonce,prix_suppose,liquidite,raison_courte,fait_date_cite,source
+horodatage_utc,id_decision,id_position,action,instrument,ticker,place,devise,sens,quantite,multiplicateur,type_ordre,limite,horizon_annonce,prix_suppose,liquidite,notionnel_sous_jacent,raison_courte,fait_date_cite,source
