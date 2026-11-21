@@ -45,6 +45,10 @@
 
 Les limites de risque que le trader s'impose **à lui-même** dans sa charte sont une autre affaire : elles ne sont pas opposables par le courtier, il est libre de les violer, et ces violations sont comptées en **B4**.
 
+## 1ter · Inventaire des limites
+
+L'intégralité de ce qui contraint le trader est listée dans **`LIMITES-DU-TRADER.md`**, classée par nature : limites qui restreignent réellement ses décisions, mécanique de courtier, plomberie de mesure, et liste de ce qui n'est pas limité. **Une contrainte présente dans le code et absente de ce fichier est une faute de protocole**, vérifiable par `runner/verifier-protocole.py`.
+
 ## 2 · Ce que l'expérience NE conclura pas
 
 Avec une surperformance vraie de 6 %/an et une erreur de suivi mensuelle de 4 %, il faut de l'ordre de **250 mois** pour atteindre un t de 2. Sur douze mois :

@@ -24,6 +24,22 @@ La question posée n'est pas « est-ce que l'IA sait investir ? ». Sur un an, c
 6. **Les frais, le change, le portage du levier, le coût d'emprunt des titres vendus à découvert et l'impôt sont modélisés.** Un carnet levé sans coût de financement a l'air brillant : c'est le premier gisement de faux alpha.
 7. **Aucun agent n'a accès à un outil de passage d'ordre.** Jamais, dans aucun bras, même « pour tester ».
 
+## Ce qui limite le trader, et ce qui ne le limite pas
+
+**[`LIMITES-DU-TRADER.md`](LIMITES-DU-TRADER.md) en donne l'inventaire exhaustif**, limites discutables incluses. En résumé : quatre contraintes seulement pèsent réellement sur ses décisions, et **la plus lourde de loin est la cadence quotidienne, qui exclut tout l'intraday**. Tout le reste est soit la mécanique d'un vrai courtier (marge, portage, appel de marge, frais, impôt), soit la plomberie sans laquelle il n'y a pas de mesure (append-only, traçabilité des données, aveuglement réciproque).
+
+Ne sont **pas** limités : le levier (il choisit son régime), la concentration, les instruments, la géographie, la rotation, l'obligation de justifier, de diversifier ou de se couvrir. Personne ne révise ses décisions et rien ne pénalise son risque.
+
+## Comment ça tourne, et comment le vérifier
+
+Le dossier [`runner/`](runner/) publie **le mécanisme d'exécution lui-même** : les prompts verbatim des trois tâches planifiées, les horaires, et pourquoi le trader et le mesureur tournent dans deux sessions distinctes à neuf heures d'intervalle plutôt que dans une seule.
+
+```
+python3 runner/verifier-protocole.py
+```
+
+Six contrôles mécaniques, exécutables par n'importe qui : le pré-enregistrement n'a pas bougé depuis le premier ordre, aucune ligne de données n'a été retirée, les schémas sont intacts, aucune prédiction n'a été glissée après coup, le mesureur n'a pas touché aux fichiers qui lui sont interdits, et aucun outil de passage d'ordre n'est utilisé nulle part.
+
 ## Résultats
 
 Le graphique central est la **courbe à deux séries** : capitaux propres déclarés par le trader contre capitaux propres mesurés indépendamment, avec l'aire entre les deux ventilée par source de divergence.

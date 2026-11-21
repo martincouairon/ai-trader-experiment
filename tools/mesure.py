@@ -148,6 +148,7 @@ class Prix:
             if not tk or not d:
                 continue
             bar = {"ouverture": f(r.get("ouverture"), None), "cloture": f(r.get("cloture"), None),
+                   "haut": f(r.get("haut"), None), "bas": f(r.get("bas"), None),
                    "devise": (r.get("devise") or "EUR").upper(),
                    "source": r.get("source") or "", "qualite": r.get("qualite") or ""}
             u = tk.upper().split(".")[0]
@@ -163,12 +164,15 @@ class Prix:
     def bar(self, tk, d):
         return self.par_ticker.get(tk, {}).get(str(d)[:10])
 
-    def ouverture_suivante(self, tk, apres):
-        """Première ouverture STRICTEMENT après la date de décision."""
+    def sessions_apres(self, tk, apres, maxi):
+        """Les séances cotées STRICTEMENT après la date de décision, dans l'ordre."""
+        out = []
         for d in self.dates(tk):
             if jour(d) > jour(apres) and self.bar(tk, d)["ouverture"]:
-                return d, self.bar(tk, d)
-        return None, None
+                out.append((d, self.bar(tk, d)))
+                if len(out) >= maxi:
+                    break
+        return out
 
     def derniere_cloture(self, tk, au_plus_tard):
         res = None
@@ -184,6 +188,49 @@ class Prix:
 
 
 # ----------------------------------------------------------------- exécution conventionnelle
+SESSIONS_GTC = 90          # une validité longue reste finie
+
+
+def remplir(type_ordre, achat, limite, bar, pb):
+    """Sémantique réelle du type d'ordre, à partir de la barre de la séance.
+    Retourne (prix, motif_non_execution). Un ordre limité remplit AU PLUS à sa limite
+    et ne subit pas de glissement : c'est précisément ce qu'on achète en le posant.
+    Un ordre au marché ou déclenché par un stop subit le glissement."""
+    t = (type_ordre or "limite").strip().lower()
+    o, h, b = bar["ouverture"], bar.get("haut"), bar.get("bas")
+    adv = (1 + pb / 10_000.0) if achat else (1 - pb / 10_000.0)
+    if "marche" in t or "market" in t:
+        return o * adv, None
+    if "stop" in t:
+        if not limite:
+            return None, "ordre stop sans seuil"
+        if achat:
+            if o >= limite:
+                return o * adv, None                      # déjà au-dessus : déclenché à l'ouverture
+            if h is not None and h >= limite:
+                return limite * adv, None
+            return None, f"seuil stop {limite} non atteint (haut {h})"
+        if o <= limite:
+            return o * adv, None
+        if b is not None and b <= limite:
+            return limite * adv, None
+        return None, f"seuil stop {limite} non atteint (bas {b})"
+    # ordre à cours limité
+    if not limite:
+        return o * adv, None                              # pas de limite donnée : traité au marché
+    if achat:
+        if o <= limite:
+            return o, None                                # exécuté mieux que la limite
+        if b is not None and b <= limite:
+            return limite, None
+        return None, f"limite {limite} non touchée (bas {b})"
+    if o >= limite:
+        return o, None
+    if h is not None and h >= limite:
+        return limite, None
+    return None, f"limite {limite} non touchée (haut {h})"
+
+
 def executer(decisions, prix):
     fills = []
     for r in decisions:
@@ -198,14 +245,17 @@ def executer(decisions, prix):
         inst = (r.get("instrument") or "action").strip().lower()
         place = r.get("place") or ""
         devise = (r.get("devise") or "EUR").upper()
+        type_ordre = (r.get("type_ordre") or "limite").strip()
+        limite = f(r.get("limite"), None)
         hor = (r.get("horodatage_utc") or "")[:10]
         mult = f(r.get("multiplicateur"), MULTIPLICATEUR.get(inst, 1.0)) or 1.0
         notionnel = f(r.get("notionnel_sous_jacent"), None)
-        d_fill, bar = prix.ouverture_suivante(tk, hor)
+        gtc = "gtc" in type_ordre.lower() or (r.get("validite") or "").strip().lower() == "gtc"
         base = {
             "id_decision": r.get("id_decision"), "horodatage_decision": r.get("horodatage_utc"),
             "ticker": tk, "instrument": inst, "place": place, "devise": devise,
-            "action": act, "sens": sens, "quantite": q,
+            "action": act, "sens": sens, "quantite": q, "type_ordre": type_ordre, "limite": limite,
+            "validite": "gtc" if gtc else "jour",
             "horizon_annonce": r.get("horizon_annonce"),
             "prix_suppose_trader": f(r.get("prix_suppose"), None),
             "multiplicateur": mult, "notionnel_sous_jacent": notionnel,
@@ -215,22 +265,38 @@ def executer(decisions, prix):
             fills.append({**base, "statut": "non_execute",
                           "motif": "notionnel_sous_jacent non déclaré — exigence de marge inconnue (§1bis)"})
             continue
-        if not bar:
-            fills.append({**base, "statut": "non_execute",
-                          "motif": "aucun cours d'ouverture postérieur à la décision dans prices.csv"})
-            continue
-        # sens économique : achat si on ouvre/renforce un long ou ferme/réduit un short
         achat = (act in ("ouvrir", "renforcer") and sens == "long") or \
                 (act in ("reduire", "fermer") and sens == "short")
         pb = glissement_pb(inst, place, r.get("liquidite"))
-        px_ouv = bar["ouverture"]
-        px = px_ouv * (1 + pb / 10_000.0) if achat else px_ouv * (1 - pb / 10_000.0)
+        sessions = prix.sessions_apres(tk, hor, SESSIONS_GTC if gtc else 1)
+        if not sessions:
+            fills.append({**base, "statut": "non_execute",
+                          "motif": "aucune séance cotée postérieure à la décision dans prices.csv"})
+            continue
+        px = d_fill = bar = None
+        motifs = []
+        for d_c, bar_c in sessions:
+            p_c, motif = remplir(type_ordre, achat, limite, bar_c, pb)
+            if p_c:
+                px, d_fill, bar = p_c, d_c, bar_c
+                break
+            motifs.append(f"{d_c} : {motif}")
+        if not px:
+            fills.append({**base, "statut": "non_execute", "sessions_testees": len(sessions),
+                          "motif": ("ordre " + ("GTC " if gtc else "")
+                                    + "non touché — " + " · ".join(motifs[:3])
+                                    + (" …" if len(motifs) > 3 else ""))})
+            continue
         montant_dev = px * q * mult
         fx = prix.taux(d_fill) if devise == "USD" else 1.0
         courtage, change, detail = frais_ordre(inst, place, q, montant_dev, devise, prix.taux(d_fill))
         montant_eur = montant_dev / fx if devise != "EUR" else montant_dev
+        glissement_applique = ("marche" in type_ordre.lower() or "stop" in type_ordre.lower()
+                               or not limite)
         fills.append({**base, "statut": "execute", "date_execution": d_fill,
-                      "prix_ouverture": round(px_ouv, 6), "glissement_pb": pb,
+                      "sessions_testees": sessions.index((d_fill, bar)) + 1,
+                      "prix_ouverture": round(bar["ouverture"], 6),
+                      "glissement_pb": pb if glissement_applique else 0.0,
                       "prix_execution": round(px, 6), "sens_economique": "achat" if achat else "vente",
                       "montant_devise": round(montant_dev, 2), "fx": round(fx, 6),
                       "montant_eur": round(montant_eur, 2),
@@ -697,7 +763,8 @@ def main():
     ecrire(os.path.join(R, "data", "fills.csv"), fills, [
         "id_decision", "horodatage_decision", "date_execution", "ticker", "instrument", "place", "devise",
         "action", "sens", "sens_economique", "quantite", "horizon_annonce", "prix_ouverture", "glissement_pb",
-        "id_position", "prix_execution", "prix_suppose_trader", "ecart_prix_suppose_pct", "multiplicateur",
+        "id_position", "type_ordre", "limite", "validite", "sessions_testees", "prix_execution",
+        "prix_suppose_trader", "ecart_prix_suppose_pct", "multiplicateur",
         "notionnel_sous_jacent", "montant_devise", "fx", "montant_eur",
         "courtage_eur", "change_eur", "cout_total_eur", "statut", "source_prix", "qualite_prix",
         "detail_frais", "motif"])
