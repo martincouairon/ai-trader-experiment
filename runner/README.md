@@ -25,3 +25,7 @@ python3 runner/verifier-protocole.py
 ```
 
 Le script contrôle, à partir de l'historique git et du contenu du dépôt : que `PRE-REGISTRATION.md` n'a pas été modifié depuis sa publication, qu'aucune ligne n'a été retirée d'un fichier de données (append-only), que les en-têtes attendus sont intacts, et qu'aucune prédiction n'a été introduite après coup. **N'importe qui peut le lancer**, c'est l'intérêt d'un dépôt public.
+
+## Où vivent les commits
+
+Le clone de travail est sur la machine de l'utilisateur, pas dans un environnement cloud éphémère : chaque agent y committe, et **c'est la date de ce commit qui fait foi**, pas celle du push. La machine n'ayant aucun identifiant GitHub, le push passe par l'environnement cloud de la session : un `git bundle` des commits est transféré puis poussé tel quel, sans réécriture ni `--force`. Les empreintes et les dates des commits sont donc identiques sur la machine et sur GitHub. Un push qui échoue n'est qu'un retard : les commits partent à l'envoi suivant.
