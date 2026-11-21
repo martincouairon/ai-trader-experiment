@@ -12,7 +12,7 @@
 | Première décision | **2026-11-24** |
 | Lecture de l'indicateur primaire | **2027-02-24** (3 mois) |
 | Fin engagée | **2027-11-24** (12 mois), sans prolongation possible |
-| Fréquence | **quotidienne**, jours ouvrés |
+| Fréquence | **trois fenêtres de décision par jour ouvré** (13h08, 16h08 et 19h08 UTC). L'exécution reste à l'ouverture de la séance suivante (§5) : les trois fenêtres d'une journée s'exécutent au plus tôt le lendemain |
 | Univers | **mondial, sans restriction de place** |
 | Instruments | **sans restriction** : actions, ETF, ETC, obligations, options, futures, produits à levier, vente à découvert |
 | Levier | **choisi par le trader** via son régime de marge, dans les exigences réelles de ce régime (§1bis). Aucun plafond imposé par le protocole |

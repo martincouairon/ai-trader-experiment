@@ -10,8 +10,8 @@ Classement par nature, parce que toutes ces limites n'ont pas le même statut : 
 
 Ce sont les seules qui amputent l'espace des stratégies. Il y en a quatre, et la première est de loin la plus lourde.
 
-### A1 — **Une seule fenêtre de décision par jour. L'intraday est exclu.** ⚠️
-Le trader décide une fois par jour ouvré. **Toute stratégie intraday est donc hors d'atteinte** : scalping, momentum de séance, arbitrage d'ouverture, réaction à une publication en cours de séance. Il peut poser un ordre qui sera déclenché pendant une séance (stop, limite), mais il ne peut pas **réagir** à l'intérieur d'une séance.
+### A1 — **Trois fenêtres de décision par jour, exécution à la séance suivante. L'intraday est exclu.** ⚠️
+Le trader est réveillé trois fois par jour ouvré (13h08, 16h08 et 19h08 UTC), mais toute décision s'exécute au plus tôt à l'ouverture de la séance suivante. Les fenêtres lui donnent plus d'information, pas une exécution plus rapide. **Toute stratégie intraday reste donc hors d'atteinte** : scalping, momentum de séance, arbitrage d'ouverture, réaction à une publication en cours de séance. Il peut poser un ordre qui sera déclenché pendant une séance (stop, limite), mais il ne peut pas **réagir** à l'intérieur d'une séance.
 **C'est la limite la plus sévère de tout le dispositif**, et elle découle d'un choix de cadence, pas d'une nécessité. Une cadence horaire ou une boucle événementielle la lèverait, au prix d'un coût de calcul multiplié.
 
 ### A2 — Un horizon annoncé est obligatoire sur chaque ordre

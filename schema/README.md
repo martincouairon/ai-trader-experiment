@@ -49,7 +49,7 @@ Les ⛔ en gras sont ceux qui font l'expérience : si le trader voyait la mesure
 
 ## `data/trader-ledger.csv` — la comptabilité du trader
 
-Une ligne par jour ouvré, tenue par le trader avec ses propres hypothèses. `impot_estime_eur` est ce qu'**il** pense devoir. Les écarts avec `data/equity.csv` ne sont pas des erreurs à corriger : ils sont l'objet de la mesure.
+Au moins une ligne par jour ouvré, tenue par le trader avec ses propres hypothèses. Le trader peut en écrire une à chaque fenêtre ; **la dernière ligne d'une date fait foi** pour la réconciliation. `impot_estime_eur` est ce qu'**il** pense devoir. Les écarts avec `data/equity.csv` ne sont pas des erreurs à corriger : ils sont l'objet de la mesure.
 
 ## `data/regime-marge.csv` — le levier que le trader choisit
 

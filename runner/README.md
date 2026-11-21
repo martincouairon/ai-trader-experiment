@@ -8,11 +8,11 @@ Les trois agents sont des sessions **Claude** distinctes, déclenchées par des 
 
 | Tâche | Quand | Agent | Prompt |
 |---|---|---|---|
-| Décision | chaque jour ouvré, **13h00 UTC**, avant l'ouverture américaine | trader | `tache-trader.md` |
-| Mesure | chaque jour ouvré, **22h30 UTC**, après la clôture américaine | mesureur | `tache-mesureur.md` |
+| Décisions | chaque jour ouvré, **13h08, 16h08 et 19h08 UTC** : une seule tâche, trois déclenchements | trader | `tache-trader.md` |
+| Mesure | chaque jour ouvré, **22h41 UTC**, après la clôture américaine | mesureur | `tache-mesureur.md` |
 | Réconciliation et rapport | le 1er de chaque mois | rédacteur | `tache-mensuelle.md` |
 
-**Deux tâches séparées plutôt qu'une seule session qui jouerait les deux rôles** : c'est le point de conception le plus important du dispositif. Une seule session verrait les deux comptabilités et l'aveuglement ne reposerait plus que sur sa discipline. Deux sessions distinctes, à neuf heures d'intervalle, avec des listes de fichiers d'entrée disjointes, le rendent structurel.
+**Deux tâches séparées plutôt qu'une seule session qui jouerait les deux rôles** : c'est le point de conception le plus important du dispositif. Une seule session verrait les deux comptabilités et l'aveuglement ne reposerait plus que sur sa discipline. Des sessions distinctes, la mesure venant après la dernière fenêtre du trader, avec des listes de fichiers d'entrée disjointes, le rendent structurel.
 
 ## Le décalage d'une séance
 
@@ -28,4 +28,8 @@ Le script contrôle, à partir de l'historique git et du contenu du dépôt : qu
 
 ## Où vivent les commits
 
-Le clone de travail est sur la machine de l'utilisateur, pas dans un environnement cloud éphémère : chaque agent y committe, et **c'est la date de ce commit qui fait foi**, pas celle du push. La machine n'ayant aucun identifiant GitHub, le push passe par l'environnement cloud de la session : un `git bundle` des commits est transféré puis poussé tel quel, sans réécriture ni `--force`. Les empreintes et les dates des commits sont donc identiques sur la machine et sur GitHub. Un push qui échoue n'est qu'un retard : les commits partent à l'envoi suivant.
+Les trois tâches s'exécutent **dans le cloud**, sans dépendre d'un ordinateur allumé. Chaque exécution clone le dépôt depuis GitHub, committe et pousse directement ; l'horodatage UTC du commit est celui de la décision. L'environnement d'exécution est effacé à la fin de chaque session : un commit qui n'a pas été poussé est perdu. C'est pourquoi chaque prompt impose de pousser avant de terminer, et, si le push échoue malgré tout, de reproduire le patch complet dans la réponse finale de la session pour qu'il puisse être appliqué à la main, avec sa date d'origine.
+
+## La fenêtre de décision et le sur-trading
+
+Tripler la cadence crée un risque de sur-rotation par simple effet de convocation : un agent réveillé trois fois peut se croire tenu d'agir trois fois. Le prompt du trader le neutralise explicitement (« C'est une occasion de décider, pas un quota à remplir »), et les frais, le change, le portage et l'impôt sont imputés à chaque aller-retour.

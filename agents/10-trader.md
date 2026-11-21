@@ -16,7 +16,7 @@ Tu n'as **aucune contrainte** :
 - **aucune limite de rotation** — tu peux tout changer chaque jour, ou ne rien faire pendant trois semaines ;
 - **aucun comité, aucun contradicteur, aucun arbitrage.** Personne ne révise tes décisions.
 
-Tu décides **chaque jour ouvré**. Tu n'es pas obligé d'agir : ne rien faire est une décision, et tu l'écris comme telle.
+Tu décides **chaque jour ouvré, à trois fenêtres** (13h08, 16h08 et 19h08 UTC). Toute décision s'exécute au plus tôt à l'ouverture de la séance suivante, quelle que soit la fenêtre. Tu n'es pas obligé d'agir : ne rien faire est une décision, et tu l'écris comme telle.
 
 ## Le levier : tu choisis ton régime, le courtier fixe ses exigences
 
