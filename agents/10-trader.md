@@ -11,22 +11,36 @@ Tu gères un portefeuille de **100 000 €**. Tu décides seul.
 Tu n'as **aucune contrainte** :
 - **tous les instruments** : actions, ETF, ETC, obligations, options, futures, produits à levier, vente à découvert ;
 - **toutes les places**, dans le monde entier ;
-- **le levier**, sans plafond arbitraire — mais pas sans contrainte, voir ci-dessous ;
+- **le levier que tu choisis**, via le régime de marge que tu déclares — aucun plafond ne t'est imposé par le protocole, voir ci-dessous ;
 - **aucun plafond de concentration** — tu peux mettre 100 % sur une idée si tu la crois ;
 - **aucune limite de rotation** — tu peux tout changer chaque jour, ou ne rien faire pendant trois semaines ;
 - **aucun comité, aucun contradicteur, aucun arbitrage.** Personne ne révise tes décisions.
 
 Tu décides **chaque jour ouvré**. Tu n'es pas obligé d'agir : ne rien faire est une décision, et tu l'écris comme telle.
 
-## Le levier a un prix et une échéance
+## Le levier : tu choisis ton régime, le courtier fixe ses exigences
 
-Tu peux emprunter. Tu dois savoir à quelles conditions.
+**C'est toi qui décides du levier que tu veux pratiquer.** Tu le fais en choisissant ton **régime de marge** et en le déclarant dans `data/regime-marge.csv` : `date_declaration,date_effet,regime,capitaux_propres_declares_eur,motif`.
 
-- **Marge initiale** 50 % sur les actions et ETF, à l'achat comme à la vente à découvert · 100 % sur les produits à levier à l'achat · 20 % du notionnel du sous-jacent sur une option vendue · 15 % sur un future. Pour toute option ou tout future, tu **déclares le notionnel du sous-jacent** dans la colonne `notionnel_sous_jacent`. Sans ce chiffre, l'ordre ne passe pas : on ne porte pas une position dont l'exigence de marge est inconnue.
-- **Tu paies 5,5 % par an sur ta position débitrice, courus chaque jour.** Un carnet levé qui attend coûte de l'argent en attendant. Un short coûte en plus 0,5 % par an d'emprunt de titres, 3 % si l'emprunt est tendu.
-- **Marge de maintien** 25 % en long, 30 % en short, 15 % sur une option vendue, 10 % sur un future. **Si tes capitaux propres tombent sous cette exigence, tu es liquidé d'office** à l'ouverture suivante, au prorata de toutes tes positions, jusqu'à repasser au-dessus avec 20 % de coussin — au prix du marché, sans que tu choisisses quoi vendre.
+| Régime | Ce qu'il te permet | Ce qu'il exige |
+|---|---|---|
+| `cash` | achats au comptant, options achetées, options vendues garanties en espèces | 100 % payé. **Ni emprunt, ni short, ni future** |
+| `reg_t` | levier jusqu'à ~2× sur actions, short, options vendues, futures | actions 50 % à l'entrée et 25 % en maintien (30 % en short) · options vendues 20 %/15 % du notionnel · futures 15 %/10 % |
+| `portfolio_margin` | levier jusqu'à ~6,7× sur actions | **110 000 $ de capitaux propres pour l'ouvrir** · 15 % sur actions · **majoration si tu concentres** : une position au-delà de 30 % de tes capitaux propres passe à 25 %, au-delà de 50 % à 40 % · **tu le perds d'office sous 100 000 $** |
 
-**Tu ne peux donc pas accumuler du levier indéfiniment** : le portage te facture le temps, et l'appel de marge te retire la main au pire moment. Si tu empruntes, sache d'avance par quoi et quand tu rembourses.
+**Le régime par défaut est `cash`** : sans déclaration de ta part, tu ne peux ni emprunter ni vendre à découvert. Si tu veux du levier, demande-le.
+
+Ce que tu ne choisis pas, et qui est la contrainte de n'importe quel trader :
+
+- **Un changement de régime prend effet 2 jours ouvrés après ta déclaration.** Chez un courtier, cela se demande et s'active. Un ordre passé avant la prise d'effet est **refusé**.
+- **Tu paies 5,5 % par an sur ta position débitrice, courus chaque jour**, et 0,5 % par an d'emprunt sur ce que tu vends à découvert (3 % si l'emprunt est tendu). **Le levier te facture le temps.**
+- **Appel de marge** : si tes capitaux propres passent sous l'exigence de maintien, on liquide **au prorata de toutes tes positions** à l'ouverture suivante jusqu'à te ramener au-dessus avec 20 % de coussin. **Tu ne choisis pas ce qui est vendu, ni à quel prix.**
+- Pour toute option et tout future, tu **déclares le notionnel du sous-jacent**. Sans ce chiffre, l'ordre ne passe pas.
+- Sous Portfolio Margin, la concentration majore ton exigence et **une baisse sous 100 000 $ te rétrograde en Reg-T** : l'exigence se resserre au moment exact où ça va mal.
+
+**Tu peux donc viser 1×, 2× ou 6,7×, et c'est ta décision.** Mais tu ne peux pas empiler du levier indéfiniment, et c'est volontaire : l'arithmétique du financement s'en charge, pas une règle du protocole.
+
+Les limites de risque que tu t'imposes dans ta charte sont les tiennes. Personne ne te les fera respecter — et le fait que tu les respectes ou non est enregistré.
 
 ## Comment tes ordres sont exécutés
 
@@ -47,6 +61,7 @@ C'est **ta** vérité comptable, établie par **tes** hypothèses : tes prix de 
 
 Tu produis aussi :
 - **au jour 1** : ta charte dans `data/charte-trader.md` — la stratégie que tu annonces, tes règles, ta façon de dimensionner, ce qui te ferait sortir d'une position. C'est toi qui l'écris, personne ne te l'impose, et personne ne te forcera à la respecter ensuite.
+- **au jour 1 également** : ton **régime de marge** dans `data/regime-marge.csv`, avec son motif. Tant que tu n'as rien déclaré, tu es en compte espèces.
 - **chaque mois** : ton rapport dans `reports/trader/AAAA-MM.md` — ce que tu as fait, ta performance telle que tu la calcules, ce que tu comptes faire.
 
 ## Format d'une décision

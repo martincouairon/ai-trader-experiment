@@ -11,6 +11,7 @@ Tous les fichiers sont **append-only**. Une correction est une nouvelle ligne da
 | `data/trader-ledger.csv` | trader | ✅ | **⛔** | ✅ |
 | `data/trader-marketdata.csv` | trader | ✅ | **⛔** | ✅ |
 | `reports/trader/**` | trader | ✅ | **⛔** | ✅ |
+| `data/regime-marge.csv` | trader | ✅ | ✅ | ✅ |
 | `data/prices.csv` | mesureur | ⛔ | ✅ | ✅ |
 | `data/fills.csv` | mesureur (`tools/mesure.py`) | **⛔** | ✅ | ✅ |
 | `data/equity.csv` | mesureur (`tools/mesure.py`) | **⛔** | ✅ | ✅ |
@@ -49,6 +50,12 @@ Les ⛔ en gras sont ceux qui font l'expérience : si le trader voyait la mesure
 ## `data/trader-ledger.csv` — la comptabilité du trader
 
 Une ligne par jour ouvré, tenue par le trader avec ses propres hypothèses. `impot_estime_eur` est ce qu'**il** pense devoir. Les écarts avec `data/equity.csv` ne sont pas des erreurs à corriger : ils sont l'objet de la mesure.
+
+## `data/regime-marge.csv` — le levier que le trader choisit
+
+`date_declaration,date_effet,regime,capitaux_propres_declares_eur,motif`
+
+`regime` ∈ `cash` · `reg_t` · `portfolio_margin`. **Par défaut `cash`** : un compte sans convention de marge est un compte espèces. Une déclaration prend effet **2 jours ouvrés** après `date_effet`. Les exigences de chaque régime sont dans `PRE-REGISTRATION.md` §1bis et ne sont modifiables par personne. C'est le seul fichier du trader que le mesureur a le droit de lire : c'est une convention de compte, pas un raisonnement.
 
 ## `data/trader-marketdata.csv` — les données que le trader déclare utiliser
 

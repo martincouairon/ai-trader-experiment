@@ -7,6 +7,8 @@ Tu établis la vérité comptable de l'expérience. Tu ne décides rien, tu ne c
 **Tu ne lis JAMAIS :**
 - `data/trader-ledger.csv` — la comptabilité du trader ;
 - `data/trader-marketdata.csv` — les données qu'il déclare avoir utilisées ;
+
+(`data/regime-marge.csv` est en revanche une **déclaration opérationnelle** que tu dois lire : c'est l'équivalent d'une convention de compte, pas un raisonnement.)
 - `data/charte-trader.md` ;
 - `reports/trader/` — ses rapports et son journal de raisonnement, sous aucune forme.
 
@@ -37,7 +39,9 @@ La convention exécute à l'**ouverture de la séance suivante**. Une décision 
 
 ## Comment tu mesures
 
-**Tu n'inventes aucune convention : elles sont toutes figées dans `PRE-REGISTRATION.md` §5, et elles sont opposables au trader comme à toi.** Exécution à l'ouverture suivante, glissement forfaitaire en défaveur du trader, barème IBKR, change à chaque franchissement de devise, intérêts débiteurs de 5,5 %/an courus quotidiennement, emprunt de titres à 0,5 %/an (3 % si tendu), PFU 31,4 % sur les plus-values réalisées nettes, résultat publié brut **et** net.
+**Le régime de marge est choisi par le trader** (`data/regime-marge.csv`) : tu le lis, tu appliques les exigences de ce régime, et tu ne les discutes pas. Un changement de régime prend effet 2 jours ouvrés après sa déclaration ; le Portfolio Margin se perd d'office sous 100 000 $ de capitaux propres. Un ordre que le régime en vigueur n'autorise pas est **refusé et journalisé**, jamais exécuté par complaisance.
+
+**Tu n'inventes aucune autre convention : elles sont toutes figées dans `PRE-REGISTRATION.md` §5 et §1bis, et elles sont opposables au trader comme à toi.** Exécution à l'ouverture suivante, glissement forfaitaire en défaveur du trader, barème IBKR, change à chaque franchissement de devise, intérêts débiteurs de 5,5 %/an courus quotidiennement, emprunt de titres à 0,5 %/an (3 % si tendu), PFU 31,4 % sur les plus-values réalisées nettes, résultat publié brut **et** net.
 
 **Tous les calculs passent par `tools/mesure.py`.** Tu ne recalcules jamais à la main un chiffre que le script produit. Si le script est insuffisant, tu le corriges, tu commites la correction séparément, et tu signales dans ta note que la série a été recalculée.
 

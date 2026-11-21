@@ -20,8 +20,9 @@ La question posée n'est pas « est-ce que l'IA sait investir ? ». Sur un an, c
 2. **Aucun backtest.** L'expérience avance en temps réel uniquement. Un agent avec accès au web ne peut pas être empêché de savoir ce qui s'est produit sur une date passée.
 3. **Append-only.** Un commit horodaté par décision, jamais de `force-push`, jamais de réécriture d'une ligne publiée. L'historique git **est** la piste d'audit.
 4. **Le rendement brut ne vaut rien seul.** Toute performance est publiée contre l'indice monde à flux identiques, contre le Livret A, et contre un témoin aléatoire.
-5. **Les frais, le change, le portage du levier, le coût d'emprunt des titres vendus à découvert et l'impôt sont modélisés.** Un carnet levé sans coût de financement a l'air brillant : c'est le premier gisement de faux alpha.
-6. **Aucun agent n'a accès à un outil de passage d'ordre.** Jamais, dans aucun bras, même « pour tester ».
+5. **Le trader choisit son levier, le courtier fixe ses exigences.** Il déclare son régime de marge — compte espèces, Reg-T ou Portfolio Margin — et le protocole ne lui impose aucun plafond. En revanche les exigences de chaque régime sont celles d'un vrai courtier : seuil d'éligibilité, majoration de concentration, délai de 2 jours pour changer de régime, appel de marge avec liquidation forcée, et perte du Portfolio Margin sous 100 000 $.
+6. **Les frais, le change, le portage du levier, le coût d'emprunt des titres vendus à découvert et l'impôt sont modélisés.** Un carnet levé sans coût de financement a l'air brillant : c'est le premier gisement de faux alpha.
+7. **Aucun agent n'a accès à un outil de passage d'ordre.** Jamais, dans aucun bras, même « pour tester ».
 
 ## Résultats
 

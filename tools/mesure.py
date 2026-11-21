@@ -32,17 +32,39 @@ GLISSEMENT_ACTION_US_GRANDE = 2.0
 GLISSEMENT_FAIBLE_LIQUIDITE = 10.0
 GLISSEMENT_LIQUIDATION_FORCEE_PB = 10.0
 
-# Marge (PRE-REGISTRATION §1bis) : (initiale, maintien) en fraction de la valeur de marché,
-# ou du notionnel du sous-jacent déclaré pour les options vendues et les futures.
-MARGE = {
-    ("action", "long"): (0.50, 0.25), ("action", "short"): (0.50, 0.30),
-    ("etf", "long"): (0.50, 0.25), ("etf", "short"): (0.50, 0.30),
-    ("etc", "long"): (0.50, 0.25), ("etc", "short"): (0.50, 0.30),
-    ("obligation", "long"): (0.50, 0.25), ("obligation", "short"): (0.50, 0.30),
-    ("levier", "long"): (1.00, 1.00), ("levier", "short"): (0.75, 0.75),
-    ("option", "long"): (1.00, 1.00), ("option", "short"): (0.20, 0.15),   # sur notionnel déclaré
-    ("future", "long"): (0.15, 0.10), ("future", "short"): (0.15, 0.10),   # sur notionnel déclaré
+# ------------------------------------------------------------------ régimes de marge
+# Le TRADER choisit son régime (data/regime-marge.csv). Les EXIGENCES de chaque régime
+# sont celles d'un vrai courtier et ne sont négociables par personne : c'est la frontière
+# entre « l'agent décide de son levier » et « l'agent invente ses contraintes ».
+REGIMES = {
+    # compte espèces : aucun emprunt, aucune vente à découvert, options vendues garanties en espèces
+    "cash": {("action", "long"): (1.00, 1.00), ("etf", "long"): (1.00, 1.00),
+             ("etc", "long"): (1.00, 1.00), ("obligation", "long"): (1.00, 1.00),
+             ("levier", "long"): (1.00, 1.00), ("option", "long"): (1.00, 1.00),
+             ("option", "short"): (1.00, 1.00)},
+    # Reg-T (IBKR LLC) : le régime standard d'un compte sur marge
+    "reg_t": {("action", "long"): (0.50, 0.25), ("action", "short"): (0.50, 0.30),
+              ("etf", "long"): (0.50, 0.25), ("etf", "short"): (0.50, 0.30),
+              ("etc", "long"): (0.50, 0.25), ("etc", "short"): (0.50, 0.30),
+              ("obligation", "long"): (0.50, 0.25), ("obligation", "short"): (0.50, 0.30),
+              ("levier", "long"): (1.00, 1.00), ("levier", "short"): (0.75, 0.75),
+              ("option", "long"): (1.00, 1.00), ("option", "short"): (0.20, 0.15),
+              ("future", "long"): (0.15, 0.10), ("future", "short"): (0.15, 0.10)},
+    # Portfolio Margin : exigence fondée sur le risque, bien plus permissive,
+    # mais soumise à un seuil de capitaux propres et à des majorations de concentration
+    "portfolio_margin": {("action", "long"): (0.15, 0.15), ("action", "short"): (0.15, 0.15),
+                         ("etf", "long"): (0.15, 0.15), ("etf", "short"): (0.15, 0.15),
+                         ("etc", "long"): (0.15, 0.15), ("etc", "short"): (0.15, 0.15),
+                         ("obligation", "long"): (0.15, 0.15), ("obligation", "short"): (0.15, 0.15),
+                         ("levier", "long"): (0.30, 0.30), ("levier", "short"): (0.30, 0.30),
+                         ("option", "long"): (1.00, 1.00), ("option", "short"): (0.15, 0.12),
+                         ("future", "long"): (0.12, 0.08), ("future", "short"): (0.12, 0.08)},
 }
+REGIME_DEFAUT = "cash"              # un compte sans convention de marge signée est un compte espèces
+PM_SEUIL_OUVERTURE_USD = 110_000.0  # capitaux propres exigés pour ouvrir le Portfolio Margin
+PM_SEUIL_MAINTIEN_USD = 100_000.0   # en dessous, rétrogradation d'office en Reg-T
+PM_CONCENTRATION = ((0.50, 0.40), (0.30, 0.25))   # (part des capitaux propres, exigence plancher)
+DELAI_CHANGEMENT_REGIME_JOURS = 2   # un changement de régime chez un courtier n'est pas instantané
 COUSSIN_APRES_LIQUIDATION = 1.20
 MULTIPLICATEUR = {"option": 100.0}       # quantité exprimée en contrats
 SUR_NOTIONNEL = {("option", "short"), ("future", "long"), ("future", "short")}
@@ -222,14 +244,42 @@ def executer(decisions, prix):
 
 
 # ----------------------------------------------------------------- carnet, marge et courbe de capitaux propres
-def exigence(pos, inst, sens, valeur_abs, notionnel_eur, phase):
-    """Exigence de marge d'une position. phase ∈ {'initiale','maintien'}."""
-    taux = MARGE.get((inst, sens))
-    if not taux:
+def regime_au(declarations, d, equity_veille_eur, fx):
+    """Régime en vigueur à la date d : la dernière déclaration du trader dont le délai
+    de prise d'effet est écoulé, rétrogradée d'office si le Portfolio Margin n'est plus tenu."""
+    courant = REGIME_DEFAUT
+    for r in sorted(declarations, key=lambda x: x.get("date_effet", "")):
+        de = (r.get("date_effet") or "").strip()[:10]
+        reg = (r.get("regime") or "").strip().lower()
+        if not de or reg not in REGIMES:
+            continue
+        if (jour(d) - jour(de)).days >= DELAI_CHANGEMENT_REGIME_JOURS:
+            courant = reg
+    if courant == "portfolio_margin":
+        eq_usd = (equity_veille_eur or 0.0) * (fx or 1.0)
+        if eq_usd < PM_SEUIL_MAINTIEN_USD:
+            return "reg_t", (f"Portfolio Margin perdu : capitaux propres {eq_usd:,.0f} $ "
+                             f"< {PM_SEUIL_MAINTIEN_USD:,.0f} $ — rétrogradation d'office en Reg-T")
+    return courant, None
+
+
+def exigence(regime, inst, sens, valeur_abs, notionnel_eur, phase, equity_eur=None):
+    """Exigence de marge d'une position sous le régime en vigueur.
+    phase ∈ {'initiale','maintien'}. Retourne (montant, interdit_motif)."""
+    table = REGIMES.get(regime, REGIMES["reg_t"])
+    taux = table.get((inst, sens))
+    if taux is None:
+        if regime == "cash":
+            return 0.0, f"{inst} {sens} indisponible en compte espèces"
         taux = (0.50, 0.30)
     t = taux[0] if phase == "initiale" else taux[1]
     assiette = notionnel_eur if (inst, sens) in SUR_NOTIONNEL and notionnel_eur else valeur_abs
-    return t * assiette
+    if regime == "portfolio_margin" and equity_eur and assiette > 0:
+        for part, plancher in PM_CONCENTRATION:
+            if assiette > part * equity_eur:
+                t = max(t, plancher)
+                break
+    return t * assiette, None
 
 
 def cle_position(x):
@@ -244,7 +294,7 @@ def cle_position(x):
     return f"{x['ticker']}|{inst}|{(x.get('sens') or 'long').strip().lower()}"
 
 
-def derouler(fills, prix, jusqua):
+def derouler(fills, prix, jusqua, declarations=None):
     """Rejoue les exécutions jour par jour, avec marge, portage et liquidation forcée.
     Les futures sont tenus en marge de variation : aucun décaissement à l'entrée,
     la variation quotidienne passe en trésorerie, la position ne porte pas de valeur."""
@@ -263,6 +313,9 @@ def derouler(fills, prix, jusqua):
     lignes, evenements = [], []
     liquidation_en_attente = 0.0        # fraction à liquider à l'ouverture suivante
     nb_appels = 0
+    declarations = declarations or []
+    equity_veille = CAPITAL_INITIAL_EUR
+    regime_veille = None
 
     def appliquer(x, q_signee, pr):
         """Applique un mouvement de q_signee unités au prix unitaire pr (devise), frais inclus hors."""
@@ -295,6 +348,16 @@ def derouler(fills, prix, jusqua):
     d = d0
     while d <= d1:
         ds = d.isoformat()
+        regime, motif_degrade = regime_au(declarations, ds, equity_veille, prix.taux(ds))
+        if motif_degrade:
+            evenements.append({"date": ds, "type": "regime_retrograde", "detail": motif_degrade})
+        if regime != regime_veille:
+            evenements.append({"date": ds, "type": "regime_de_marge",
+                               "detail": f"régime en vigueur : **{regime}**"
+                                         + (f" (précédent : {regime_veille})" if regime_veille else
+                                            " — aucune déclaration du trader n'a encore pris effet"
+                                            if regime == REGIME_DEFAUT else "")})
+            regime_veille = regime
 
         # --- liquidation forcée décidée la veille, exécutée à l'ouverture du jour
         if liquidation_en_attente > 0:
@@ -327,8 +390,16 @@ def derouler(fills, prix, jusqua):
                                          + " · ".join(detail)})
             liquidation_en_attente = 0.0
 
-        # --- exécutions du jour
+        # --- exécutions du jour, sous réserve que le régime les autorise
         for x in par_jour.get(ds, []):
+            sens_pos = "long" if ((x["sens"] == "long") == (x["action"] in ("ouvrir", "renforcer"))) else "short"
+            _, interdit = exigence(regime, x["instrument"], x["sens"], 0.0, 0.0, "initiale")
+            if interdit and x["action"] in ("ouvrir", "renforcer", "inverser"):
+                x["statut"] = "refuse_regime"
+                x["motif"] = f"régime {regime} : {interdit}"
+                evenements.append({"date": ds, "type": "ordre_refuse",
+                                   "detail": f"{x['id_decision']} {x['ticker']} — {x['motif']}"})
+                continue
             signe = 1 if x["sens_economique"] == "achat" else -1
             appliquer(x, signe * x["quantite"], x["prix_execution"])
             cash -= x["cout_total_eur"]
@@ -357,8 +428,8 @@ def derouler(fills, prix, jusqua):
                 val = p["q"] * px * p["mult"] / fx
                 notion_eur = abs(p["notionnel_u"] * p["q"]) / fx
             sens = "long" if p["q"] > 0 else "short"
-            exig_maint += exigence(p, p["inst"], sens, abs(val), notion_eur, "maintien")
-            exig_init += exigence(p, p["inst"], sens, abs(val), notion_eur, "initiale")
+            exig_maint += exigence(regime, p["inst"], sens, abs(val), notion_eur, "maintien", equity_veille)[0]
+            exig_init += exigence(regime, p["inst"], sens, abs(val), notion_eur, "initiale", equity_veille)[0]
             if val or p["inst"] == "future":
                 poids.append(abs(val) if val else notion_eur)
             if val >= 0:
@@ -392,8 +463,9 @@ def derouler(fills, prix, jusqua):
                                          f"levier brut {expo_brute/capitaux if capitaux>0 else float('nan'):.2f}× · "
                                          f"liquidation de {k*100:.1f} % programmée à l'ouverture suivante"})
 
+        equity_veille = capitaux
         lignes.append({
-            "date": ds, "cash_eur": round(cash, 2), "valeur_positions_eur": round(valeur_pos, 2),
+            "date": ds, "regime_marge": regime, "cash_eur": round(cash, 2), "valeur_positions_eur": round(valeur_pos, 2),
             "capitaux_propres_eur": round(capitaux, 2),
             "exposition_brute_eur": round(expo_brute, 2),
             "levier_brut": round(expo_brute / capitaux, 4) if capitaux > 0 else None,
@@ -523,6 +595,9 @@ def comportement(decisions, fills, equity):
          "note": "HORS RESSORT DU MESUREUR — exige les rapports du trader"},
         {"indicateur": "B11_fidelite_donnees_invoquees", "valeur": None, "n": 0,
          "note": "HORS RESSORT DU MESUREUR — exige data/trader-marketdata.csv, voir le rédacteur"},
+        {"indicateur": "B12_regimes_utilises",
+         "valeur": "|".join(sorted({l.get("regime_marge", "") for l in equity})), "n": len(equity),
+         "note": "régimes de marge que le trader a choisis sur la période"},
         {"indicateur": "B12_nb_appels_de_marge",
          "valeur": sum(1 for l in equity if l.get("appel_de_marge") == "oui"), "n": len(equity),
          "note": "franchissements de l'exigence de maintien ; liquidations forcées dans les événements"},
@@ -555,6 +630,7 @@ def note_md(equity, bench, metrics, fills, evenements, jusqua):
           f"performance **{e['perf_depuis_debut_pct']} %** depuis le {DATE_DEBUT}".replace(",", " "),
           f"Exposition brute {e['exposition_brute_eur']:,.0f} € · levier {e['levier_brut']}× · "
           f"{e['nb_lignes']} lignes · première ligne {e['poids_premiere_ligne_pct']} %".replace(",", " "),
+          f"Régime de marge en vigueur : **{e['regime_marge']}** (choisi par le trader)".replace(",", " "),
           f"Marge : exigence de maintien {e['exigence_maintien_eur']:,.0f} € · "
           f"disponible **{e['marge_disponible_eur']:,.0f} €** · appel de marge ce jour : "
           f"{e['appel_de_marge']}".replace(",", " "),
@@ -611,9 +687,10 @@ def main():
     R = a.racine
     decisions = lire(os.path.join(R, "data", "decisions.csv"))
     prix = Prix(lire(os.path.join(R, "data", "prices.csv")))
+    declarations = lire(os.path.join(R, "data", "regime-marge.csv"))
 
     fills = executer(decisions, prix)
-    equity, evenements = derouler(fills, prix, a.jusqua)
+    equity, evenements = derouler(fills, prix, a.jusqua, declarations)
     bench = benchmark(equity, prix, a.jusqua)
     metrics = comportement(decisions, fills, equity)
 
@@ -625,7 +702,8 @@ def main():
         "courtage_eur", "change_eur", "cout_total_eur", "statut", "source_prix", "qualite_prix",
         "detail_frais", "motif"])
     ecrire(os.path.join(R, "data", "equity.csv"), equity, [
-        "date", "cash_eur", "valeur_positions_eur", "capitaux_propres_eur", "capitaux_propres_net_pfu_eur",
+        "date", "regime_marge", "cash_eur", "valeur_positions_eur", "capitaux_propres_eur",
+        "capitaux_propres_net_pfu_eur",
         "exposition_brute_eur", "levier_brut", "exigence_initiale_eur", "exigence_maintien_eur",
         "marge_disponible_eur", "appel_de_marge", "pv_realisee_cumulee_eur", "pfu_du_eur", "frais_cumules_eur",
         "change_cumule_eur", "portage_cumule_eur", "emprunt_cumule_eur", "friction_totale_cumulee_eur",

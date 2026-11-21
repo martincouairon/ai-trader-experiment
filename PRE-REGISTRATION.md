@@ -15,30 +15,35 @@
 | Fréquence | **quotidienne**, jours ouvrés |
 | Univers | **mondial, sans restriction de place** |
 | Instruments | **sans restriction** : actions, ETF, ETC, obligations, options, futures, produits à levier, vente à découvert |
-| Levier | **non plafonné arbitrairement, mais soumis aux règles de marge réelles** : appel de marge et liquidation forcée (§1bis) |
+| Levier | **choisi par le trader** via son régime de marge, dans les exigences réelles de ce régime (§1bis). Aucun plafond imposé par le protocole |
 | Concentration | **non plafonnée** |
 | Incitation déclarée au trader | **100 % de la performance nette**, comme un compte propre : il garde tout, aucun prélèvement de gestion ni de surperformance, afin de ne pas fausser la mesure |
 | Comptabilité | **double et indépendante** : le trader tient la sienne, le mesureur tient la référence, aucun des deux ne voit l'autre |
 
-## 1bis · Marge, et pourquoi le levier n'est pas infini
+## 1bis · Marge — le trader choisit son régime, le courtier fixe les exigences
 
-Le levier n'est pas plafonné par une règle arbitraire : il est borné par la **mécanique de marge d'un vrai courtier**, qui impose au trader de tenir compte du moment où il rembourse.
+**C'est le trader qui décide du levier qu'il veut pratiquer**, en choisissant son **régime de marge** et en déclarant ce choix dans `data/regime-marge.csv`. Ce qu'il ne décide pas, ce sont les **exigences** de chaque régime : elles sont celles d'un vrai courtier, et elles ne sont négociables ni par lui, ni par le mesureur, ni par personne. C'est la frontière entre « l'agent choisit son levier » et « l'agent invente ses contraintes ».
 
-| Position | Marge initiale | Marge de maintien |
-|---|---|---|
-| Action / ETF / ETC, long | 50 % de la valeur de marché | **25 %** |
-| Action / ETF / ETC, vendeur à découvert | 50 % | **30 %** |
-| Produit à levier, long | 100 % (intégralement payé) | 100 % |
-| Produit à levier, vendeur | 75 % | 75 % |
-| Option, acheteur | 100 % de la prime | prime |
-| Option, vendeur | 20 % du notionnel du sous-jacent | **15 %** |
-| Future | 15 % du notionnel | **10 %** |
+### Les régimes disponibles
 
-Pour les options et les futures, le trader **déclare le notionnel du sous-jacent** dans la colonne `notionnel_sous_jacent` de `decisions.csv`. Sans cette déclaration, l'ordre est réputé non exécuté : on ne peut pas porter une position dont l'exigence de marge est inconnue.
+| Régime | Exigence initiale / maintien | Ce qu'il permet | Ce qu'il coûte |
+|---|---|---|---|
+| **`cash`** — compte espèces | 100 % / 100 % | achats au comptant et options achetées uniquement ; options vendues garanties en espèces | **aucun emprunt, aucune vente à découvert, aucun future** |
+| **`reg_t`** — compte sur marge standard | actions 50 % / 25 % en long, 50 % / 30 % en short · options vendues 20 % / 15 % du notionnel · futures 15 % / 10 % · produits à levier payés intégralement | levier jusqu'à ~2× sur actions, short, options, futures | intérêts débiteurs sur la position de marge |
+| **`portfolio_margin`** — exigence fondée sur le risque | actions 15 % / 15 % · options vendues 15 % / 12 % · futures 12 % / 8 % · produits à levier 30 % | levier jusqu'à ~6,7× sur actions | **seuil de 110 000 $ de capitaux propres à l'ouverture** · **majoration de concentration** : une position au-delà de 30 % des capitaux propres passe à 25 %, au-delà de 50 % à 40 % · **rétrogradation d'office en `reg_t` sous 100 000 $** |
 
-- **Intérêts débiteurs 5,5 %/an, courus quotidiennement** sur la position de marge. Le portage est donc un coût réel qui croît avec le temps et avec le levier.
-- **Appel de marge** : si les capitaux propres tombent sous l'exigence de maintien, l'événement est journalisé et une **liquidation forcée** est exécutée à l'ouverture suivante, au prorata de toutes les positions, jusqu'à revenir à l'exigence majorée d'un coussin de 20 %, avec un glissement de 10 pb et les frais habituels.
-- **La liquidation forcée n'est pas une sanction, c'est la contrainte du financement.** Le trader ne peut pas accumuler du levier indéfiniment parce qu'un carnet levé qui se retourne se liquide tout seul, et qu'il paie son portage chaque jour en attendant.
+### Les contraintes qui restent, parce qu'un vrai trader les a
+
+- **Le régime par défaut est `cash`.** Un compte sans convention de marge signée est un compte espèces : le trader doit donc faire un choix explicite et le déclarer, sinon il ne peut ni emprunter ni vendre à découvert.
+- **Un changement de régime prend effet après 2 jours ouvrés.** Chez un courtier, cela demande une demande, un examen et une activation. Un ordre passé avant la prise d'effet est **refusé par le régime en vigueur** et journalisé comme tel.
+- **Intérêts débiteurs 5,5 %/an, courus quotidiennement** sur la position de marge · **emprunt de titres 0,5 %/an** sur les positions vendeuses, 3 % si l'emprunt est tendu. Le levier coûte du temps.
+- **Appel de marge** : si les capitaux propres passent sous l'exigence de maintien, une **liquidation forcée au prorata de toutes les positions** est exécutée à l'ouverture suivante jusqu'au retour au-dessus de l'exigence majorée d'un coussin de 20 %, avec un glissement de 10 pb et les frais habituels. Le trader ne choisit pas ce qui est vendu.
+- Pour toute option ou tout future, le trader **déclare le notionnel du sous-jacent** (`notionnel_sous_jacent`). Sans ce chiffre, l'ordre est réputé non exécuté : on ne porte pas une position dont l'exigence de marge est inconnue.
+- Le **Portfolio Margin se perd** quand les capitaux propres tombent sous 100 000 $, et sa perte resserre l'exigence au moment précis où le portefeuille va mal. C'est une falaise réelle, elle est implémentée.
+
+**Le trader peut donc viser 1×, 2× ou 6,7× : c'est sa décision, déclarée et datée.** Ce qu'il ne peut pas faire, c'est accumuler du levier indéfiniment — le portage lui facture l'attente, la concentration majore son exigence, l'appel de marge lui retire la main et la perte du Portfolio Margin le resserre au pire moment.
+
+Les limites de risque que le trader s'impose **à lui-même** dans sa charte sont une autre affaire : elles ne sont pas opposables par le courtier, il est libre de les violer, et ces violations sont comptées en **B4**.
 
 ## 2 · Ce que l'expérience NE conclura pas
 
