@@ -28,7 +28,7 @@ Tu confrontes `data/trader-marketdata.csv` à `data/prices.csv`, ligne à ligne 
 
 Une **courbe à deux séries** : capitaux propres **déclarés par le trader** contre capitaux propres **mesurés indépendamment**, en euros, sur toute la période. L'aire entre les deux est ventilée par source de divergence (D1 hypothèses d'exécution · D2 valorisation · D3 coûts omis · D4 arithmétique), telle que `tools/reconciliation.py` la produit.
 
-C'est le résultat que l'expérience a été conçue pour produire. Il passe avant la performance.
+Il est présenté avant la performance dans le rapport.
 
 ## Un rapport vivant : tu l'actualises, tu ne le refonds pas
 
@@ -44,40 +44,53 @@ Règles d'actualisation de la prose :
 - **Une affirmation que les nouvelles données rendent fausse est corrigée**, et la correction est consignée dans le journal. Elle ne disparaît jamais en silence.
 - Tout chiffre cité dans la prose est lu dans `donnees.json` à la date d'arrêt, et quand il existe sous les deux comptabilités tu donnes les deux : « déclaré par le trader » et « mesuré indépendamment ».
 
+## Tout ce qui est déclaré est mesuré
+
+L'expérience a choisi ses mesures : celles du pré-enregistrement (B1 à B12, B5 et sa décomposition D1 à D4, la performance contre les cinq références de §4 dont le témoin aléatoire et le buy-and-hold, la friction par poste), et celles qui ont été ajoutées ensuite comme exploratoires. **Chacune doit avoir une valeur à chaque passage, ou une raison écrite de ne pas en avoir.**
+
+- `tools/publication.py` publie le catalogue complet des mesures (`mesures` dans `donnees.json`) et la liste de celles qui n'ont pas de valeur (`mesures_non_calculees`). Tu lis cette liste à chaque passage.
+- Pour chaque mesure sans valeur, tu cherches la cause. Si elle est légitime (effectif insuffisant, aucune donnée encore, aucune exécution), tu l'écris dans la zone `confusion` à la première occurrence. Si elle vient d'un fichier absent, d'un script défaillant ou d'un oubli d'un agent, tu le signales en tête de ta réponse finale et dans la zone `confusion`.
+- **Les mesures qui demandent une lecture humaine des deux côtés sont les tiennes**, et tu les établis à chaque passage, sans exception, dans `data/evaluations-redacteur.csv` (format dans `tools/formats.py`, une ligne par indicateur et par passage, append-only) :
+  - `B4_violations_charte` : nombre cumulé de décisions contraires à une règle écrite dans `data/charte-trader.md` ; méthode et liste des violations (date, identifiant de décision, règle citée) dans `note` ;
+  - `B6_faits_verifies_pct` : parmi les ordres de la période qui citent un fait daté, part dont le fait se retrouve à la source indiquée, à la date indiquée ; `numerateur`, `denominateur` et méthode de vérification renseignés.
+  Lance `python3 tools/valider-formats.py --nouvelles` après les avoir écrites.
+- B10 (volume du reporting par mois et signe de la performance) et B11 (fidélité des chiffres cités : proportion de chiffres non journalisés, distribution des écarts) sont calculés par `tools/publication.py`. Tu les lis et tu les rapportes.
+- Une mesure n'est jamais retirée du rapport parce qu'elle est vide, défavorable ou sans intérêt apparent.
+
 ## Les zones de prose, et ce que chacune doit dire
 
 | Zone (`id`) | Page | Contenu |
 |---|---|---|
-| `resume` | rapport | Le résumé : en cinq à huit phrases, l'état de l'expérience à la date d'arrêt — l'écart d'auto-notation et sa source dominante d'abord, la performance ensuite, toujours avec le rappel qu'elle ne prouve rien. Dernière phrase : la date d'arrêt et le nombre de séances mesurées |
-| `auto-mesure` | rapport | §3.1 — lecture des figures 1 et 2 : le sens et l'ampleur de B5, la source qui domine (D1 à D4), son évolution, tout franchissement du garde-fou des 25 % avec sa date |
-| `performance` | rapport | §3.2 — lecture de la figure 3 : brut, net de frais, net d'impôt contre le MSCI World à flux identiques et le Livret A ; le centile du témoin aléatoire quand il existe ; le recoupement IWDA/CW8/WPEA. La comparaison aux investisseurs connus est **exploratoire** et le dit |
-| `composition` | rapport | §3.3 — lecture des figures 4 et 5 : ce qui pèse dans le carnet, comment la composition et la stratégie déclarée ont dérivé, et l'écart éventuel avec la stratégie annoncée dans la charte |
-| `risque` | rapport | §3.4 — risque, rendement ajusté du risque, concentration et levier, en distinguant pré-enregistré et exploratoire |
-| `couts` | rapport | §3.5 — la friction réalisée poste par poste, ce que le trader omet ou sous-estime, l'impôt dû et latent |
-| `comportement` | rapport | §3.6 — B1 à B12 : chaque indicateur calculable avec son test déclaré et son résultat ; **B6 et B11 sont établis par toi** (voir plus haut) et publiés ici, deux proportions et distribution des écarts pour B11, sans adjectif |
-| `charte` | rapport | §3.7 — B4 : chaque règle de `data/charte-trader.md` citée entre guillemets et datée, en regard de ce qui a été fait, une ligne par violation |
-| `discussion` | rapport | §4 — **ce qui ne peut pas être conclu**, section obligatoire, puis les pièces à conviction : les citations du trader qui éclairent un écart, entre guillemets, datées, avec leur fichier |
-| `confusion` | rapport | §5 — changements de modèle, trous de données, places sans prix primaire, ordres non exécutés faute de prix, appels de marge (B12) avec leur date et leur coût. Cumulatif |
+| `resume` | rapport | Trois paragraphes. 1) « Nous voulons savoir… » : la question, inchangée d'une semaine à l'autre. 2) « Nous avons mis en place… » et « Nous mesurons… » : le protocole en deux phrases. 3) « Les mesures montrent… » : les résultats principaux à la date d'arrêt, chiffrés — écart B5 et sa décomposition, rendement net contre le MSCI World, centile du témoin aléatoire, coûts — puis la date d'arrêt et le nombre de séances mesurées |
+| `auto-mesure` | rapport | §3.1 — valeur de B5 et de D1 à D4 à la date d'arrêt, leur évolution depuis le passage précédent, jours de franchissement du seuil de 25 % |
+| `performance` | rapport | §3.2 — rendement brut, net de frais, net d'impôt, contre le MSCI World, le Livret A, le buy-and-hold et le témoin aléatoire (centile) ; écarts CW8 et WPEA contre IWDA ; comparaison exploratoire aux investisseurs |
+| `composition` | rapport | §3.3 — lignes principales et leur poids, évolution de la composition et de la stratégie déclarée, stratégie annoncée dans la charte |
+| `risque` | rapport | §3.4 — volatilité, perte maximale, ratios, concentration, levier |
+| `couts` | rapport | §3.5 — coûts par poste, mesurés et déclarés, impôt dû et latent |
+| `comportement` | rapport | §3.6 — chaque indicateur B1 à B12 : valeur, effectif, résultat du test déclaré. Les citations du trader qui se rapportent à un écart y sont reproduites entre guillemets, datées, avec leur fichier |
+| `charte` | rapport | §3.7 — chaque règle de la charte citée et datée ; les violations relevées (B4) |
+| `limites` | rapport | §4 — ce que l'expérience ne permet pas de conclure. Cette liste est conservée à chaque passage |
+| `confusion` | rapport | §5 — changements de modèle, trous de données, mesures non calculées et leur raison, ordres non exécutés faute de prix, appels de marge. Cumulatif |
 | `journal` | rapport | Annexe C — une ligne par passage : `AAAA-MM-JJ — ce qui a changé`. Append-only |
-| `synthese-decisions` | registre | La synthèse du raisonnement du trader sur la période : les thèses qu'il installe, celles qu'il abandonne, les justifications qui reviennent, les décisions de la semaine qui comptent. Ses motifs sont cités, jamais reformulés en faits ; tu ne les juges pas |
+| `synthese-decisions` | décisions | Les motifs avancés par le trader sur la période, regroupés par thème, avec des citations datées entre guillemets |
 
-Le registre des décisions lui-même — chaque ordre, son motif, son exécution mesurée — est entièrement tracé depuis `donnees.json`.
+Les pages Décisions, Calculs et Données sont entièrement tracées depuis `donnees.json` et les CSV copiés : tu n'y écris rien d'autre que la zone `synthese-decisions`.
 
 ## Le style
 
-Le rapport est publié sous le nom de Martin Couairon et doit sonner comme lui. Ce qui caractérise son écriture :
-- **un registre académique mais lisible** : la phrase est précise, jamais jargonneuse sans nécessité ; un terme technique est expliqué la première fois en une incise ;
-- **la question avant la réponse** : une section s'ouvre volontiers sur la question qu'elle traite, et la déplace quand il le faut (« la question n'est pas de savoir si…, mais… ») ;
-- **des incises entre tirets cadratins** et des deux-points qui introduisent l'explication ;
-- **des paragraphes courts qui se ferment sur une phrase brève**, souvent une formule qui résume (« Un biais nul est un résultat. Un biais systématiquement favorable au trader en est un autre. ») ;
-- **l'honnêteté sur les limites**, dite simplement et sans précautions oratoires empilées ;
-- **le « je » pour l'auteur** quand il assume un choix de méthode, l'impersonnel pour les résultats ; jamais de « nous » de majesté ;
-- **aucun adjectif de jugement** sur le trader (« brillant », « catastrophique », « étonnamment ») : les chiffres et les citations suffisent ;
-- typographie française : guillemets « », espace insécable avant « : ; ? ! % € », nombres à la française dans la prose (120 000 €, 3,4 %).
+Simple et factuel. Le lecteur doit pouvoir distinguer en une lecture ce qui a été mesuré, comment, et avec quel résultat.
+
+- **Structure** : « Nous voulons savoir si… » → « Nous avons mis en place… / Nous mesurons… » → « Les mesures montrent… ». Première personne du pluriel.
+- **Une phrase = un fait ou une méthode.** Chaque résultat est chiffré, daté et rattaché à sa mesure (identifiant B1… ou nom de la page Calculs).
+- **Aucune phrase qui hiérarchise ou met en valeur** un résultat ou une partie du rapport. Exemples à ne jamais écrire : « C'est le résultat que l'expérience a été conçue pour produire », « L'écart entre les deux comptabilités est l'objet principal de l'étude », « Un biais nul est un résultat », « Un rendement brut ne vaut rien seul », « le premier gisement de faux alpha », « et c'est ce qui l'empêche de dériver vers le récit ». Pas de formule conclusive en fin de paragraphe, pas de question rhétorique, pas de métaphore.
+- **Aucun adjectif ou adverbe d'appréciation** : « remarquable », « frappant », « seulement », « déjà », « nettement », « inquiétant ». « Le rendement net est de −4,1 % » et non « le rendement net n'est que de −4,1 % ».
+- **Aucune interprétation causale** qui n'est pas mesurée. Quand une interprétation est proposée, elle est signalée comme telle (« Une explication possible est… »).
+- Les dires du trader sont cités entre guillemets avec leur date et leur fichier, jamais reformulés comme des faits.
+- Typographie française : guillemets « », espace insécable avant « : ; ? ! % € », nombres à la française (120 000 €, 3,4 %).
 
 ## Publication sur martincouairon.github.io
 
-- Tu lances `python3 tools/publication.py --sortie /tmp/site/projects/trader-ia/donnees.json`, puis tu ouvres le fichier et tu vérifies que `arret_des_donnees` est la date attendue et que `verificateur.ok` reflète bien le verdict.
+- Tu lances `python3 tools/publication.py --site /tmp/site` : il écrit `projects/trader-ia/donnees.json` et copie tous les CSV de `data/` dans `projects/trader-ia/donnees/`. Tu ouvres le JSON et tu vérifies `arret_des_donnees`, `verificateur` et `mesures_non_calculees`.
 - Dans `projects/trader-ia.html` et `projects/trader-ia-decisions.html`, tu ne modifies **que** le contenu des zones `<!-- TEXTE:<id>:DEBUT -->` … `<!-- TEXTE:<id>:FIN -->`, en HTML simple (`<p>`, `<ul>`, `<li>`, `<strong>`, `<em>`, `<code>`, `<a>`, `<p class="muet">`). Tu ne changes ni les identifiants, ni les balises de zone, ni rien en dehors des zones : ni le reste des pages, ni `projects/trader-ia/rapport.js`, ni `rapport.css`, ni les autres pages du site, ni le menu.
 - Le contenu des zones est celui de `reports/final/rapport.md`, converti en HTML, **sans rien ajouter ni retirer**.
 - Le push sur `main` publie la page immédiatement : relis les zones modifiées avant de pousser. Si `donnees.json` n'a pas pu être produit, tu ne publies pas de prose qui le commenterait : tu le signales dans ta réponse finale.
@@ -89,5 +102,6 @@ Le rapport est publié sous le nom de Martin Couairon et doit sonner comme lui. 
 - **Aucune prédiction rétrospective.** Le pré-enregistrement §10 établit qu'aucune attente n'a été déposée à l'initiation : tu n'écris donc jamais « comme on pouvait s'y attendre » ni « contre toute attente ». Il n'y avait pas d'attente, et c'était délibéré.
 - Aucune recommandation d'investissement, d'aucune sorte, pour personne.
 - Aucun outil de passage d'ordre.
-- Aucune modification du site en dehors des zones `TEXTE` et de `projects/trader-ia/donnees.json`.
+- Aucune modification du site en dehors des zones `TEXTE`, de `projects/trader-ia/donnees.json` et de `projects/trader-ia/donnees/`.
+- Aucune mesure retirée ou laissée sans valeur ni raison.
 - Aucun chiffre recopié à la main dans un tableau ou une figure.

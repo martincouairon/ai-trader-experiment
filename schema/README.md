@@ -24,6 +24,8 @@ Les fichiers écrits par les agents sont **append-only**. Une correction est une
 | `data/benchmark-investisseurs.csv` | mesureur (`tools/mesure.py`) | **⛔** | ✅ | ✅ |
 | `data/benchmark.csv` | mesureur | **⛔** | ✅ | ✅ |
 | `data/metrics-comportement.csv` | mesureur | **⛔** | ✅ | ✅ |
+| `data/metrics-historique.csv` | mesureur (`tools/mesure.py`) | **⛔** | ✅ | ✅ |
+| `data/evaluations-redacteur.csv` | rédacteur | **⛔** | **⛔** | ✅ |
 | `data/reconciliation.csv` | `tools/reconciliation.py` | **⛔** | **⛔** | ✅ |
 | `reports/final/**` | rédacteur | **⛔** | ⛔ | ✅ |
 
@@ -105,4 +107,8 @@ Barres quotidiennes. Quatre tickers réservés : **`IWDA`** (référence princip
 
 `reconciliation.csv` porte B5 et sa décomposition D1 à D4, exhaustive par construction : `divergence = D1 + D2 + D3 + D4`. La divergence est calculée **nette d'impôt des deux côtés**, pour que l'écart d'impôt figure dans D3 sans polluer D4.
 
-`tools/publication.py` assemble le tout en un seul fichier JSON au format `trader-ia/1`, que la page publique lit pour tracer ses figures.
+`benchmark.csv` porte aussi `buy_and_hold_eur` : les achats du premier jour d'exécution, conservés sans jamais être vendus. `metrics-comportement.csv` porte, en plus de B1 à B12, le témoin aléatoire du §4 (`temoin_mediane_eur`, `temoin_p05_eur`, `temoin_p95_eur`, `temoin_centile_trader`) : 1 000 portefeuilles aux mêmes titres, mêmes montants et même nombre d'opérations, à dates tirées au hasard, graine fixe. `metrics-historique.csv` conserve ces indicateurs pour chaque date de mesure, ce qui permet de les suivre dans le temps.
+
+`evaluations-redacteur.csv` reçoit, à chaque passage du rédacteur, les indicateurs qui demandent une lecture humaine des deux côtés : `B4_violations_charte` et `B6_faits_verifies_pct`. Colonnes : `date_arret,indicateur,numerateur,denominateur,valeur,methode,note`.
+
+`tools/publication.py` assemble le tout en un seul fichier JSON au format `trader-ia/1`, que la page publique lit pour tracer ses figures. Ce fichier contient le catalogue de toutes les mesures : définition, formule opérationnelle, valeur, série dans le temps, et raison quand la valeur manque. B6 (première proportion), B10 et B11 y sont calculés mécaniquement.

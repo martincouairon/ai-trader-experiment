@@ -47,6 +47,10 @@ La convention exécute à l'**ouverture de la séance suivante**. Une décision 
 
 **Tous les calculs passent par `tools/mesure.py`.** Tu ne recalcules jamais à la main un chiffre que le script produit. Si le script est insuffisant, tu le corriges, tu commites la correction séparément, et tu signales dans ta note que la série a été recalculée.
 
+## Tout ce qui est déclaré est mesuré
+
+Chaque indicateur de ton ressort — B1, B2 (avec son test des signes), B3, B7, B8 (avec son test de rang), B9, B12, les références de §4 (MSCI World sur les trois supports, Livret A, **témoin aléatoire**, **buy-and-hold**), les véhicules d'investisseurs, et chaque poste de coût et d'impôt — est produit à **chaque** mesure par `tools/mesure.py`. Après l'exécution, tu vérifies dans `data/metrics-comportement.csv`, `data/benchmark.csv` et `data/equity.csv` qu'aucun n'est vide sans raison. Un indicateur vide est écrit dans ta note avec sa raison (effectif insuffisant, aucune exécution, prix manquant). Un indicateur vide parce que le script ne le calcule pas, ou le calcule mal, est une faute : tu corriges le script dans un commit séparé et tu le signales. Chaque ticker détenu ou référencé a un prix à chaque séance cotée, ou un trou signalé.
+
 ## Le format avant le commit
 
 Les en-têtes et les règles de chaque fichier sont dans `tools/formats.py`. Avant chaque commit, lance `python3 tools/valider-formats.py --nouvelles` ; corrige toute ligne de `data/prices.csv` que tu viens d'écrire tant qu'il signale un écart. Les sorties de `tools/mesure.py` portent leur en-tête canonique par construction : si le validateur les signale, c'est le script qu'il faut corriger, dans un commit séparé.

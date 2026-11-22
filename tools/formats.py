@@ -97,7 +97,8 @@ BENCHMARK = ["date", "capitaux_propres_eur", "capitaux_propres_net_pfu_eur",
              "iwda_flux_identiques_eur", "ecart_vs_iwda_eur", "ecart_net_vs_iwda_eur",
              "cw8_flux_identiques_eur", "ecart_vs_cw8_eur", "ecart_net_vs_cw8_eur", "ecart_cw8_vs_iwda_pct",
              "wpea_flux_identiques_eur", "ecart_vs_wpea_eur", "ecart_net_vs_wpea_eur", "ecart_wpea_vs_iwda_pct",
-             "livret_a_eur", "ecart_vs_livret_eur", "iwda_liquidatif_net_eur"]
+             "livret_a_eur", "ecart_vs_livret_eur", "iwda_liquidatif_net_eur",
+             "buy_and_hold_eur", "ecart_vs_buy_and_hold_eur"]
 
 # Comparaison EXPLORATOIRE, non pré-enregistrée : véhicules cotés d'investisseurs connus,
 # à flux identiques (120 000 € investis le premier jour). Un véhicule coté n'est pas le
@@ -112,6 +113,12 @@ BENCHMARK_INVESTISSEURS = ["date", "ticker", "investisseur", "vehicule", "devise
                            "valeur_flux_identiques_eur", "qualite"]
 
 METRICS = ["indicateur", "valeur", "n", "note"]
+METRICS_HISTORIQUE = ["date_mesure", "indicateur", "valeur", "n", "note"]
+
+# Indicateurs que seul le rédacteur peut établir (il est le seul à lire les deux côtés) :
+# une ligne par indicateur et par passage hebdomadaire, append-only.
+EVALUATIONS_REDACTEUR = ["date_arret", "indicateur", "numerateur", "denominateur", "valeur", "methode", "note"]
+INDICATEURS_REDACTEUR = ("B4_violations_charte", "B6_faits_verifies_pct")
 
 # ------------------------------------------------------------------ sortie de tools/reconciliation.py
 RECONCILIATION = ["date", "capitaux_declares_eur", "capitaux_mesures_eur", "impot_declare_eur",
@@ -138,5 +145,26 @@ FICHIERS = {
     "data/benchmark.csv": BENCHMARK,
     "data/benchmark-investisseurs.csv": BENCHMARK_INVESTISSEURS,
     "data/metrics-comportement.csv": METRICS,
+    "data/metrics-historique.csv": METRICS_HISTORIQUE,
+    "data/evaluations-redacteur.csv": EVALUATIONS_REDACTEUR,
     "data/reconciliation.csv": RECONCILIATION,
+}
+
+# Description de chaque fichier, publiée avec les données sur la page « Données ».
+DESCRIPTIONS = {
+    "data/decisions.csv": ("trader", "Registre d'ordres : une ligne par ordre, ou une ligne « aucune » par fenêtre sans ordre."),
+    "data/trader-ledger.csv": ("trader", "Comptabilité tenue par le trader, une ligne par fenêtre ; la dernière ligne d'une date fait foi."),
+    "data/trader-positions.csv": ("trader", "Inventaire et marques du trader, une ligne par position et par fenêtre."),
+    "data/trader-marketdata.csv": ("trader", "Données de marché que le trader déclare avoir consultées, avec source et heure."),
+    "data/regime-marge.csv": ("trader", "Régime de marge déclaré par le trader."),
+    "data/prices.csv": ("mesureur", "Prix quotidiens relevés par le mesureur, avec source et qualité."),
+    "data/fills.csv": ("tools/mesure.py", "Exécution conventionnelle de chaque ordre : prix, frais, change, glissement."),
+    "data/equity.csv": ("tools/mesure.py", "Comptabilité de référence, une ligne par jour : capitaux, marge, coûts et impôt cumulés."),
+    "data/positions.csv": ("tools/mesure.py", "Inventaire mesuré, une ligne par position et par jour."),
+    "data/benchmark.csv": ("tools/mesure.py", "Références à flux identiques : MSCI World (IWDA, CW8, WPEA), Livret A, buy-and-hold."),
+    "data/benchmark-investisseurs.csv": ("tools/mesure.py", "Véhicules cotés d'investisseurs connus à flux identiques (exploratoire)."),
+    "data/metrics-comportement.csv": ("tools/mesure.py", "Indicateurs comportementaux et témoin aléatoire à la dernière date de mesure."),
+    "data/metrics-historique.csv": ("tools/mesure.py", "Les mêmes indicateurs, une ligne par date de mesure."),
+    "data/evaluations-redacteur.csv": ("rédacteur", "Indicateurs qui demandent une lecture humaine des deux côtés (B4, seconde proportion de B6), une ligne par passage."),
+    "data/reconciliation.csv": ("tools/reconciliation.py", "Écart quotidien entre les deux comptabilités et sa décomposition D1 à D4."),
 }

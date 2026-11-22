@@ -91,6 +91,10 @@ REGLES = {
         "date_declaration": (1, "date"), "date_effet": (1, "date"), "regime": (1, F.REGIMES),
         "capitaux_propres_declares_eur": (1, "nombre"), "motif": (1, "texte"),
     },
+    "data/evaluations-redacteur.csv": {
+        "date_arret": (1, "date"), "indicateur": (1, F.INDICATEURS_REDACTEUR), "numerateur": (0, "nombre"),
+        "denominateur": (0, "nombre"), "valeur": (1, "nombre"), "methode": (1, "texte"),
+    },
     "data/prices.csv": {
         "date": (1, "date"), "ticker": (1, "texte"), "devise": (1, "devise"), "ouverture": (0, "nombre"),
         "haut": (0, "nombre"), "bas": (0, "nombre"), "cloture": (0, "nombre"), "source": (1, "texte"),

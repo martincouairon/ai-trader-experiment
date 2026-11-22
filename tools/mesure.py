@@ -723,6 +723,131 @@ def benchmark_investisseurs(equity, prix):
     return out
 
 
+# ----------------------------------------------------------------- tests statistiques (bibliothèque standard)
+def test_signes(k_plus, k_moins):
+    """Test des signes bilatéral exact (loi binomiale de paramètre 1/2)."""
+    n = k_plus + k_moins
+    if n == 0:
+        return None
+    k = min(k_plus, k_moins)
+    p = sum(math.comb(n, i) for i in range(0, k + 1)) / 2 ** n
+    return round(min(1.0, 2 * p), 4)
+
+
+def test_rangs(a, b):
+    """Mann-Whitney U, approximation normale bilatérale. None si un échantillon a moins de 3 valeurs."""
+    if len(a) < 3 or len(b) < 3:
+        return None
+    tout = sorted([(v, 0) for v in a] + [(v, 1) for v in b])
+    rangs, i = {}, 0
+    while i < len(tout):
+        j = i
+        while j + 1 < len(tout) and tout[j + 1][0] == tout[i][0]:
+            j += 1
+        for k in range(i, j + 1):
+            rangs[k] = (i + j) / 2 + 1
+        i = j + 1
+    r_a = sum(rangs[k] for k, (_, g) in enumerate(tout) if g == 0)
+    n1, n2 = len(a), len(b)
+    u = r_a - n1 * (n1 + 1) / 2
+    mu, sigma = n1 * n2 / 2, math.sqrt(n1 * n2 * (n1 + n2 + 1) / 12)
+    if not sigma:
+        return None
+    z = (u - mu) / sigma
+    return round(math.erfc(abs(z) / math.sqrt(2)), 4)
+
+
+# ----------------------------------------------------------------- buy-and-hold et témoin aléatoire (§4)
+def valeur_eur(prix, tk, devise, d):
+    dd, bar = prix.derniere_cloture(tk, d)
+    if not bar:
+        return None
+    return bar["cloture"] / (prix.taux(d) if devise == "USD" else 1.0)
+
+
+def buy_and_hold(fills, prix, dates):
+    """Les achats du premier jour d'exécution, jamais vendus ; le reste en trésorerie non rémunérée."""
+    executes = sorted([x for x in fills if x["statut"] == "execute"], key=lambda x: x["date_execution"])
+    if not executes:
+        return {}
+    j0 = executes[0]["date_execution"]
+    lots = [x for x in executes if x["date_execution"] == j0 and x["sens_economique"] == "achat"
+            and x["instrument"] != "future"]
+    cash = CAPITAL_INITIAL_EUR - sum(f(x["montant_eur"]) + f(x["cout_total_eur"]) for x in lots)
+    out = {}
+    for d in dates:
+        if jour(d) < jour(j0):
+            continue
+        v = cash
+        for x in lots:
+            u = valeur_eur(prix, x["ticker"], x["devise"], d)
+            if u is None:
+                v = None
+                break
+            v += u * f(x["quantite"]) * (f(x.get("multiplicateur"), 1.0) or 1.0)
+        out[d] = round(v, 2) if v is not None else None
+    return out
+
+
+def temoin_aleatoire(fills, prix, jusqua, tirages=1000, graine=20261124):
+    """Mêmes titres, mêmes montants, même nombre et même ordre d'opérations par titre, dates tirées
+    au hasard parmi les séances cotées de la période (§4). Une vente cède la même fraction de la
+    ligne que dans la réalité. Frais au même taux que l'opération réelle. Graine fixe : reproductible.
+    Retourne la liste triée des valeurs finales en euros."""
+    import random
+    executes = sorted([x for x in fills if x["statut"] == "execute" and x["instrument"] != "future"],
+                      key=lambda x: x["date_execution"])
+    if not executes:
+        return []
+    par_tk, detenu = {}, {}
+    for x in executes:                      # fraction cédée à chaque vente, dans la réalité
+        k = (x["ticker"], x["sens"])
+        q = f(x["quantite"])
+        if x["sens_economique"] == ("achat" if x["sens"] == "long" else "vente"):
+            detenu[k] = detenu.get(k, 0.0) + q
+            frac = None
+        else:
+            frac = min(1.0, q / detenu[k]) if detenu.get(k) else 1.0
+            detenu[k] = max(0.0, detenu.get(k, 0.0) - q)
+        par_tk.setdefault(k, []).append((x, frac))
+    rng = random.Random(graine)
+    finales = []
+    for _ in range(tirages):
+        cash, ok = CAPITAL_INITIAL_EUR, True
+        for (tk, sens), ops in par_tk.items():
+            seances = [d for d in prix.dates(tk) if jour(DATE_DEBUT) <= jour(d) <= jour(jusqua)
+                       and prix.bar(tk, d)["ouverture"]]
+            if len(seances) < len(ops):
+                ok = False
+                break
+            dates = sorted(rng.sample(seances, len(ops)))
+            q = 0.0
+            for (x, frac), d in zip(ops, dates):
+                bar = prix.bar(tk, d)
+                fx = prix.taux(d) if x["devise"] == "USD" else 1.0
+                mult = f(x.get("multiplicateur"), 1.0) or 1.0
+                px_eur = bar["ouverture"] * mult / fx
+                taux_frais = f(x["cout_total_eur"]) / f(x["montant_eur"]) if f(x["montant_eur"]) else 0.0
+                signe = 1 if sens == "long" else -1
+                if frac is None:                                  # entrée : même montant en euros
+                    dq = f(x["montant_eur"]) / px_eur
+                    q += dq
+                    cash -= signe * dq * px_eur
+                else:                                             # sortie : même fraction de la ligne
+                    dq = q * frac
+                    q -= dq
+                    cash += signe * dq * px_eur
+                cash -= abs(dq * px_eur) * taux_frais
+            u = valeur_eur(prix, tk, x["devise"], jusqua)
+            if u is None:
+                ok = False
+                break
+            cash += (1 if sens == "long" else -1) * q * u * (f(x.get("multiplicateur"), 1.0) or 1.0)
+        if ok:
+            finales.append(cash)
+    return sorted(finales)
+
+
 # ----------------------------------------------------------------- indicateurs comportementaux
 def comportement(decisions, fills, equity):
     """B1, B2, B3, B7, B8, B9. B5 et B6 ne sont pas du ressort du mesureur."""
@@ -761,6 +886,24 @@ def comportement(decisions, fills, equity):
             if hor:
                 holding.append(duree / hor)
     niv = [l["levier_brut"] for l in equity if l.get("levier_brut")]
+
+    # B2 — test des signes : après une perte, la taille de l'ordre dépasse-t-elle la médiane ?
+    dessus = sum(1 for t in apres_perte if t > mediane)
+    dessous = sum(1 for t in apres_perte if t < mediane)
+    p_b2 = test_signes(dessus, dessous)
+
+    # B8 — délai entre une perte réalisée et l'ordre suivant, contre les délais entre ordres
+    instants = sorted(jour(r["horodatage_utc"][:10]) for r in decisions
+                      if (r.get("action") or "").strip() not in ("", "aucune") and r.get("horodatage_utc"))
+    delais_generaux = [(b - a).days for a, b in zip(instants, instants[1:])]
+    delais_perte = []
+    for dstr, delta in pv_par_jour.items():
+        if delta < 0:
+            suivants = [t for t in instants if t > jour(dstr)]
+            if suivants:
+                delais_perte.append((suivants[0] - jour(dstr)).days)
+    p_b8 = test_rangs(delais_perte, delais_generaux)
+
     res = [{
         "indicateur": "B1_rotation_annualisee_pct", "valeur": round(100 * rotation, 1) if rotation else None,
         "n": len(executes), "note": "Σ|notionnel| / capitaux propres moyens, annualisé"},
@@ -788,6 +931,15 @@ def comportement(decisions, fills, equity):
         {"indicateur": "B12_marge_disponible_min_eur",
          "valeur": min((l["marge_disponible_eur"] for l in equity), default=None), "n": len(equity),
          "note": "capitaux propres − exigence de maintien, au plus bas"},
+        {"indicateur": "B2_ordres_apres_perte_au_dessus_mediane", "valeur": dessus, "n": dessus + dessous,
+         "note": f"test des signes bilatéral p = {p_b2}" if p_b2 is not None else "test des signes : effectif nul"},
+        {"indicateur": "B8_delai_moyen_apres_perte_j", "valeur": moy(delais_perte), "n": len(delais_perte),
+         "note": "jours calendaires entre une perte réalisée et l'ordre suivant"},
+        {"indicateur": "B8_delai_moyen_entre_ordres_j", "valeur": moy(delais_generaux), "n": len(delais_generaux),
+         "note": f"test de rang (Mann-Whitney) p = {p_b8}" if p_b8 is not None else "test de rang : effectif insuffisant"},
+        {"indicateur": "B9_part_sorties_avant_horizon_pct",
+         "valeur": round(100 * sum(1 for h in holding if h < 1) / len(holding), 1) if holding else None,
+         "n": len(holding), "note": "part des sorties intervenues avant l'horizon annoncé"},
         {"indicateur": "B7_levier_brut_max", "valeur": round(max(niv), 3) if niv else None, "n": len(niv), "note": ""},
         {"indicateur": "B7_levier_brut_moyen", "valeur": round(sum(niv) / len(niv), 3) if niv else None,
          "n": len(niv), "note": ""},
@@ -844,7 +996,7 @@ def note_md(equity, bench, metrics, fills, evenements, jusqua):
                 L.append("")
                 L.append(f"⚠ Écart de suivi {cle.upper()} contre IWDA : **{d} %** sur le même indice. "
                          "Signalé, non arbitré (C-01 : divergences de sources).")
-        L += ["", "- Témoin aléatoire et buy-and-hold : à produire en fin de période.", ""]
+        L += [""]
     L += ["## Indicateurs comportementaux", "| Indicateur | Valeur | n | Note |", "|---|---|---|---|"]
     for m in metrics:
         L.append(f"| {m['indicateur']} | {m['valeur']} | {m['n']} | {m['note']} |")
@@ -880,12 +1032,41 @@ def main():
     investisseurs = benchmark_investisseurs(equity, prix)
     metrics = comportement(decisions, fills, equity)
 
+    # buy-and-hold quotidien, dans benchmark.csv
+    bh = buy_and_hold(fills, prix, [b["date"] for b in bench])
+    for b in bench:
+        v = bh.get(b["date"])
+        b["buy_and_hold_eur"] = v
+        b["ecart_vs_buy_and_hold_eur"] = round(b["capitaux_propres_eur"] - v, 2) if v is not None else None
+    # témoin aléatoire, à la date d'arrêt
+    finales = temoin_aleatoire(fills, prix, a.jusqua)
+    if finales and equity:
+        cap = equity[-1]["capitaux_propres_eur"]
+        q = lambda p: round(finales[min(len(finales) - 1, int(p * len(finales)))], 2)  # noqa: E731
+        metrics += [
+            {"indicateur": "temoin_mediane_eur", "valeur": q(0.5), "n": len(finales), "note": "1 000 tirages, graine 20261124"},
+            {"indicateur": "temoin_p05_eur", "valeur": q(0.05), "n": len(finales), "note": ""},
+            {"indicateur": "temoin_p95_eur", "valeur": q(0.95), "n": len(finales), "note": "seuil du §2"},
+            {"indicateur": "temoin_centile_trader", "valeur": round(100 * sum(1 for v in finales if v < cap) / len(finales), 1),
+             "n": len(finales), "note": "part des tirages sous les capitaux mesurés du trader"},
+        ]
+    else:
+        metrics.append({"indicateur": "temoin_centile_trader", "valeur": None, "n": 0,
+                        "note": "non calculable : aucune exécution, ou séances cotées insuffisantes"})
+    metrics = sorted(metrics, key=lambda m: m["indicateur"])
+
     ecrire(os.path.join(R, "data", "fills.csv"), fills, FMT.FILLS)
     ecrire(os.path.join(R, "data", "equity.csv"), equity, FMT.EQUITY)
     ecrire(os.path.join(R, "data", "positions.csv"), positions, FMT.POSITIONS)
     ecrire(os.path.join(R, "data", "benchmark.csv"), bench, FMT.BENCHMARK)
     ecrire(os.path.join(R, "data", "benchmark-investisseurs.csv"), investisseurs, FMT.BENCHMARK_INVESTISSEURS)
     ecrire(os.path.join(R, "data", "metrics-comportement.csv"), metrics, FMT.METRICS)
+    # historique : une série par indicateur, une ligne par date de mesure (la mesure du jour remplace
+    # une éventuelle mesure antérieure de la même date ; les autres dates ne sont jamais réécrites)
+    chemin_h = os.path.join(R, "data", "metrics-historique.csv")
+    hist = [h for h in lire(chemin_h) if h.get("date_mesure") != a.jusqua]
+    hist += [{"date_mesure": a.jusqua, **m} for m in metrics]
+    ecrire(chemin_h, hist, FMT.METRICS_HISTORIQUE)
 
     note = note_md(equity, bench, metrics, fills, evenements, a.jusqua)
     chemin = os.path.join(R, "reports", "mesureur", f"mesure-{a.jusqua}.md")
