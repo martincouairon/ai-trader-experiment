@@ -1,4 +1,4 @@
-# Prompt de la tâche planifiée — RÉDACTEUR (le 1er de chaque mois)
+# Prompt de la tâche planifiée — RÉDACTEUR (chaque samedi, 9h17 UTC)
 
 > Envoyé verbatim. C'est la seule session qui voit les deux comptabilités.
 
@@ -19,7 +19,7 @@ Tu es le RÉDACTEUR de l'expérience `ai-trader-experiment`. Le dépôt est sur 
 
 **Interdits** : aucune conclusion de compétence tirée du rendement · aucune analyse exploratoire présentée comme pré-enregistrée · **aucune prédiction rétrospective** — le pré-enregistrement §10 établit qu'aucune attente n'a été déposée, donc jamais « comme on pouvait s'y attendre » · aucune recommandation d'investissement · aucun outil d'ordre.
 
-**Puis commite et pousse les deux dépôts**, d'abord `ai-trader-experiment` (message `rapport: <mois>`), puis le site (message `trader-ia: rapport au <date d'arrêt des données>`). L'horodatage UTC du commit fait foi. Les règles ci-dessous valent pour chacun des deux.
+**Puis commite et pousse les deux dépôts**, d'abord `ai-trader-experiment` (message `rapport: au <date d'arrêt des données>`), puis le site (message `trader-ia: rapport au <date d'arrêt des données>`). L'horodatage UTC du commit fait foi. Les règles ci-dessous valent pour chacun des deux.
 - `git push origin main`. **Jamais de `--force`, jamais de réécriture d'historique.**
 - Si le push est refusé parce que `main` a avancé : `git pull --no-rebase origin main`, puis repousse.
 - Ton environnement est effacé à la fin de la session : **ne termine jamais sans avoir poussé**. Si le push échoue encore après une nouvelle tentative, ne le contourne pas : écris en tête de ta réponse finale que le push a échoué, avec l'erreur, puis le résultat complet de `git format-patch origin/main --stdout` du dépôt concerné, pour qu'il puisse être appliqué à la main.
