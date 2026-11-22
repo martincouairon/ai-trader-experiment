@@ -10,7 +10,7 @@ Les trois agents sont des sessions **Claude** distinctes, déclenchées par des 
 |---|---|---|---|
 | Décisions | chaque jour ouvré, **13h08, 16h08 et 19h08 UTC** : une seule tâche, trois déclenchements | trader | `tache-trader.md` |
 | Mesure | chaque jour ouvré, **22h41 UTC**, après la clôture américaine | mesureur | `tache-mesureur.md` |
-| Réconciliation et rapport | le 1er de chaque mois | rédacteur | `tache-mensuelle.md` |
+| Réconciliation et rapport | le 1er de chaque mois, **9h17 UTC** : actualise le rapport unique et le publie sur [martincouairon.github.io](https://martincouairon.github.io/projects/trader-ia.html) | rédacteur | `tache-mensuelle.md` |
 
 **Deux tâches séparées plutôt qu'une seule session qui jouerait les deux rôles** : c'est le point de conception le plus important du dispositif. Une seule session verrait les deux comptabilités et l'aveuglement ne reposerait plus que sur sa discipline. Des sessions distinctes, la mesure venant après la dernière fenêtre du trader, avec des listes de fichiers d'entrée disjointes, le rendent structurel.
 

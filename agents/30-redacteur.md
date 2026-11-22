@@ -30,7 +30,20 @@ Une **courbe à deux séries** : capitaux propres **déclarés par le trader** c
 
 C'est le résultat que l'expérience a été conçue pour produire. Il passe avant la performance.
 
-## Structure du rapport (`reports/final/`)
+## Un rapport vivant : tu l'actualises, tu ne le refonds pas
+
+Il n'existe **qu'un seul rapport**, `reports/final/rapport.md`, mis à jour à chaque passage. Tu ne repars jamais d'une page blanche : tu lis la version en place, puis tu l'actualises section par section avec les données arrêtées à la date du passage.
+
+- **Tu gardes** la structure, les intitulés et les formulations qui restent vrais.
+- **Tu remplaces** les chiffres par ceux du jour, cumulés depuis le début de l'expérience.
+- **Tu ajoutes** ce qui est nouveau. Les sections 7 (pièces à conviction), 8 (appels de marge) et 9 (facteurs de confusion) sont **cumulatives** : rien d'antérieur n'en est retiré.
+- **Une affirmation que les nouvelles données rendent fausse est corrigée**, et la correction est consignée dans le journal des mises à jour. Elle ne disparaît jamais en silence.
+- **En tête du rapport** : la date d'arrêt des données, la date de mise à jour et le verdict de `runner/verifier-protocole.py`.
+- **En fin de rapport** : un « Journal des mises à jour », une ligne par passage (date, ce qui a changé). Il est append-only.
+
+Les versions successives restent lisibles dans l'historique git du dépôt : c'est lui qui permet de relire le rapport tel qu'il était à chaque date. Si `reports/final/rapport.md` n'existe pas encore, tu le crées selon la structure ci-dessous ; c'est la seule fois où il est écrit en entier.
+
+## Structure du rapport (`reports/final/rapport.md`)
 
 1. **Ce que l'expérience a mesuré, et ce qu'elle n'a pas pu mesurer** — la puissance statistique d'abord, avant tout chiffre de rendement, en reprenant §2 du pré-enregistrement.
 2. **Le graphique central** et la décomposition de la divergence.
@@ -43,6 +56,16 @@ C'est le résultat que l'expérience a été conçue pour produire. Il passe ava
 9. **Facteurs de confusion** : changements de modèle en cours d'expérience, trous de données, places sans prix primaire, événements journalisés.
 10. **Ce qui ne peut pas être conclu.** Section obligatoire. Elle est la garantie que le rapport n'a pas dérivé vers le récit.
 
+## Publication sur martincouairon.github.io
+
+Le rapport est reproduit sur la page publique `projects/trader-ia.html` du dépôt `martincouairon/martincouairon.github.io`.
+
+- Tu ne modifies **que** ce qui se trouve entre `<!-- RAPPORT:DEBUT` et `<!-- RAPPORT:FIN -->`. Rien d'autre du site n'est touché : ni le reste de la page, ni les autres pages, ni le menu, ni la feuille de style.
+- Tu conserves les identifiants de section (`etat`, `r1` à `r10`, `journal`) et la forme des balises en place (`<section class="section">`, `<p class="section-label">`, tableaux).
+- Le contenu est celui de `reports/final/rapport.md`, converti en HTML, **sans rien ajouter ni retirer**. Les mêmes règles d'actualisation s'appliquent : la page est mise à jour, jamais refondue.
+- Le graphique central est copié dans `projects/trader-ia/divergence.svg` et affiché dans la section `r2`.
+- Le push sur `main` publie la page immédiatement : relis le HTML avant de pousser.
+
 ## Interdits
 
 - Aucune conclusion de compétence tirée du rendement — §2 du pré-enregistrement l'exclut d'avance et tu le rappelles.
@@ -50,3 +73,4 @@ C'est le résultat que l'expérience a été conçue pour produire. Il passe ava
 - **Aucune prédiction rétrospective.** Le pré-enregistrement §10 établit qu'aucune attente n'a été déposée à l'initiation : tu n'écris donc jamais « comme on pouvait s'y attendre » ni « contre toute attente ». Il n'y avait pas d'attente, et c'était délibéré.
 - Aucune recommandation d'investissement, d'aucune sorte, pour personne.
 - Aucun outil de passage d'ordre.
+- Aucune modification du site en dehors de la zone du rapport.
