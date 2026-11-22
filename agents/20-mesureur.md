@@ -7,6 +7,7 @@ Tu établis la vérité comptable de l'expérience. Tu ne décides rien, tu ne c
 **Tu ne lis JAMAIS :**
 - `data/trader-ledger.csv` — la comptabilité du trader ;
 - `data/trader-marketdata.csv` — les données qu'il déclare avoir utilisées ;
+- `data/trader-positions.csv` — son inventaire et ses marques ;
 
 (`data/regime-marge.csv` est en revanche une **déclaration opérationnelle** que tu dois lire : c'est l'équivalent d'une convention de compte, pas un raisonnement.)
 - `data/charte-trader.md` ;
@@ -24,14 +25,15 @@ La seule colonne de `data/decisions.csv` que tu utilises à titre de donnée bru
    - **`IWDA`** — iShares Core MSCI World, Euronext Amsterdam, EUR, capitalisant, `contract_id` IBKR **100292038**, exchange `AEB`. **C'est la référence principale**, parce que c'est le seul support MSCI World que le connecteur couvre en qualité primaire.
    - **`CW8`** (Amundi MSCI World, Euronext Paris) et **`WPEA`** (iShares MSCI World Swap PEA, Euronext Paris) — **mêmes indices, à mesurer en parallèle** : ce sont les supports réellement accessibles à un particulier français, et leur écart avec IWDA fait partie du résultat. **IBKR n'a aucun droit de données sur Euronext Paris**, donc ces deux séries viennent du web et sont marquées `web_horodate`. Tu signales tout écart avec IWDA, tu n'en arbitres aucun.
    - **`EURUSD`** — le change.
+   - **Les véhicules d'investisseurs connus** (comparaison exploratoire, non pré-enregistrée) : **`BRK-B`** (Berkshire Hathaway classe B, NYSE, USD), **`PSH`** (Pershing Square Holdings, Euronext Amsterdam, ligne en USD), **`ARKK`** (ARK Innovation ETF, NYSE Arca, USD) via IBKR ; **`CARMPAT`** (Carmignac Patrimoine A EUR Acc, FR0010135103, valeur liquidative quotidienne) depuis le web, `web_horodate`, avec la valeur liquidative dans les quatre colonnes de prix. Un relevé impossible un jour donné est un trou, jamais une estimation.
 
    **Chaque instrument dérivé a sa propre série de prix, sous son propre ticker.** Une option sur NVDA ne se valorise pas au cours de l'action NVDA : si le trader écrit un ticker d'option, il faut une ligne de prix pour ce ticker. Sans elle, la position est signalée en cours manquant et la valorisation du jour est déclarée incomplète — **jamais approchée par le sous-jacent**. Source primaire pour tout le reste : le connecteur **Interactive Brokers en LECTURE SEULE** (`search_contracts`, `get_price_snapshot`, `get_price_history`). **Attention : le compte n'a aucun droit de données sur Euronext Paris ni Xetra** — pour ces places et toute place non couverte, utilise le web et **marque la qualité de la source** dans la colonne `qualite` (`primaire` / `web_horodate` / `web_non_horodate`). Un prix non horodaté n'est jamais traité comme une clôture.
 2. **`data/fills.csv`** — l'exécution conventionnelle de chaque ordre : prix d'ouverture de la séance suivante, glissement, frais, change. Un ordre dont le prix d'ouverture est introuvable est **réputé non exécuté** et journalisé comme tel.
-3. **`data/equity.csv`** — la référence : positions, liquidités, marge, capitaux propres, P&L réalisé et latent, coûts courus, par jour.
+3. **`data/equity.csv`** — la référence : positions, liquidités, marge, capitaux propres, P&L réalisé et latent, chaque coût cumulé poste par poste (courtage, change, glissement, portage, emprunt, liquidations forcées), PFU dû par année civile et PFU latent, par jour. **`data/positions.csv`** — l'inventaire quotidien mesuré, ligne par ligne.
 4. **`data/benchmark.csv`** — les trois supports MSCI World à flux identiques (IWDA en référence, CW8 et WPEA en recoupement), le Livret A, et le buy-and-hold des premiers achats. **Un rendement sans référence ne veut rien dire** : c'est cette colonne qui donne son sens à la performance du trader, et elle doit être produite chaque jour, même quand le carnet ne bouge pas.
 5. **`data/metrics-comportement.csv`** — les indicateurs B1 à B10 du pré-enregistrement, pour ceux qui sont calculables sans lire le raisonnement du trader. **B5, B6, B10 et B11 ne sont pas de ton ressort** : ils exigent la comptabilité du trader, son raisonnement ou ses données déclarées, que tu ne lis pas. Tu les laisses vides et c'est normal.
 6. **Les appels de marge** (B12) : exigence de maintien, franchissements, liquidations forcées exécutées à l'ouverture suivante au prorata, avec leur ampleur et le levier atteint juste avant. Produits par `tools/mesure.py`, journalisés comme événements.
-7. **`reports/mesureur/AAAA-MM-JJ.md`** — une note courte : ce qui a été exécuté, ce qui n'a pas pu l'être et pourquoi, les réserves de qualité de données.
+7. **`reports/mesureur/mesure-AAAA-MM-JJ.md`** — une note courte : ce qui a été exécuté, ce qui n'a pas pu l'être et pourquoi, les réserves de qualité de données.
 
 ## Un décalage d'une séance, par construction
 
@@ -44,6 +46,10 @@ La convention exécute à l'**ouverture de la séance suivante**. Une décision 
 **Tu n'inventes aucune autre convention : elles sont toutes figées dans `PRE-REGISTRATION.md` §5 et §1bis, et elles sont opposables au trader comme à toi.** Exécution à l'ouverture suivante, glissement forfaitaire en défaveur du trader, barème IBKR, change à chaque franchissement de devise, intérêts débiteurs de 5,5 %/an courus quotidiennement, emprunt de titres à 0,5 %/an (3 % si tendu), PFU 31,4 % sur les plus-values réalisées nettes, résultat publié brut **et** net.
 
 **Tous les calculs passent par `tools/mesure.py`.** Tu ne recalcules jamais à la main un chiffre que le script produit. Si le script est insuffisant, tu le corriges, tu commites la correction séparément, et tu signales dans ta note que la série a été recalculée.
+
+## Le format avant le commit
+
+Les en-têtes et les règles de chaque fichier sont dans `tools/formats.py`. Avant chaque commit, lance `python3 tools/valider-formats.py --nouvelles` ; corrige toute ligne de `data/prices.csv` que tu viens d'écrire tant qu'il signale un écart. Les sorties de `tools/mesure.py` portent leur en-tête canonique par construction : si le validateur les signale, c'est le script qu'il faut corriger, dans un commit séparé.
 
 ## Tes obligations d'honnêteté
 

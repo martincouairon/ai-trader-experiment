@@ -38,7 +38,11 @@ Le dossier [`runner/`](runner/) publie **le mécanisme d'exécution lui-même** 
 python3 runner/verifier-protocole.py
 ```
 
-Six contrôles mécaniques, exécutables par n'importe qui : le pré-enregistrement n'a pas bougé depuis le premier ordre, aucune ligne de données n'a été retirée, les schémas sont intacts, aucune prédiction n'a été glissée après coup, le mesureur n'a pas touché aux fichiers qui lui sont interdits, et aucun outil de passage d'ordre n'est utilisé nulle part.
+Sept contrôles mécaniques, exécutables par n'importe qui : le pré-enregistrement n'a pas bougé depuis le premier ordre, aucune ligne de données n'a été retirée, les schémas sont intacts, aucune prédiction n'a été glissée après coup, le mesureur n'a pas touché aux fichiers qui lui sont interdits, aucun outil de passage d'ordre n'est utilisé nulle part, et toutes les données respectent leur format.
+
+## Formats et publication
+
+Le format exact de chaque fichier de données est défini en un seul endroit, [`tools/formats.py`](tools/formats.py), et contrôlé par `python3 tools/valider-formats.py` — par chaque agent avant chaque commit, et par le vérificateur de protocole sur tout le dépôt. `tools/publication.py` assemble ensuite toutes les données en un fichier JSON au format constant `trader-ia/1`, que [la page publique](https://martincouairon.github.io/projects/trader-ia.html) lit pour tracer ses figures : aucun chiffre n'y est recopié à la main.
 
 ## Résultats
 

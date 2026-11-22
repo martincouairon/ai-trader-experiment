@@ -14,14 +14,21 @@ Décomposition exhaustive par construction (PRE-REGISTRATION §3bis) :
                       + D4 (résidu arithmétique)
 Un D positif est un avantage que le trader s'attribue.
 
-Entrées : data/trader-ledger.csv · data/equity.csv · data/fills.csv
+La divergence est calculée nette d'impôt des deux côtés (capitaux propres − impôt
+dû), pour que l'écart d'impôt puisse figurer dans D3 sans polluer D4.
+
+Entrées : data/trader-ledger.csv · data/trader-positions.csv · data/equity.csv
+          data/positions.csv · data/fills.csv
 Sorties : data/reconciliation.csv · reports/final/divergence.svg
           reports/final/reconciliation-<date>.md
 
 Usage : python3 tools/reconciliation.py [--racine .]
 """
-import argparse, csv, os
+import argparse, csv, os, sys
 from datetime import datetime
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import formats as FMT  # noqa: E402
 
 
 def f(x, default=0.0):
@@ -71,41 +78,92 @@ POSTES = [("frais_cumules_eur", "courtage"), ("change_cumule_eur", "change"),
           ("portage_cumule_eur", "portage"), ("emprunt_cumule_eur", "emprunt")]
 
 
-def reconcilier(trader, mesure, fills):
-    m_par_date = {r["date"]: r for r in mesure}
-    t_par_date = {r["date"]: r for r in trader}
+def derniere_par_date(lignes):
+    """La dernière ligne écrite pour une date fait foi (le trader écrit à chaque fenêtre)."""
+    out = {}
+    for r in lignes:
+        d = (r.get("date") or "")[:10]
+        if d:
+            out[d] = r
+    return out
+
+
+def d2_par_position(t_pos, m_pos):
+    """D2 au sens du pré-enregistrement §3bis : Σ (marque du trader − marque du mesureur) × quantité
+    détenue, en euros. La quantité retenue est celle que le trader croit détenir ; un écart de
+    quantité (ordre qu'il croit exécuté et qui ne l'est pas) n'est pas de la valorisation, il
+    tombe dans D1 ou D4. Une position sans marque du mesureur est ignorée et signalée."""
+    marques_m = {}
+    for r in m_pos:
+        marques_m[(r.get("ticker") or "").strip()] = r
+    total, manquants = 0.0, []
+    for r in t_pos:
+        tk = (r.get("ticker") or "").strip()
+        m = marques_m.get(tk)
+        if not m:
+            manquants.append(tk)
+            continue
+        q = f(r.get("quantite")) * (1 if (r.get("sens") or "long") == "long" else -1)
+        mult = f(r.get("multiplicateur"), 1.0) or 1.0
+        fx = f(m.get("fx_eurusd"), 1.0) or 1.0
+        total += (f(r.get("marque")) - f(m.get("cours"))) * q * mult / fx
+    return total, manquants
+
+
+def reconcilier(trader, mesure, fills, t_positions=None, m_positions=None):
+    """La divergence est calculée NETTE D'IMPÔT des deux côtés : c'est la seule base sur laquelle
+    l'impôt peut figurer dans D3 (§3bis) sans fausser le résidu D4. Les capitaux avant impôt
+    restent publiés, colonne par colonne."""
+    m_par_date = derniere_par_date(mesure)
+    t_par_date = derniere_par_date(trader)
+    tp, mp = {}, {}
+    for r in (t_positions or []):
+        tp.setdefault(r["date"], {})[r["ticker"]] = r     # dernière fenêtre de la date fait foi
+    for r in (m_positions or []):
+        mp.setdefault(r["date"], []).append(r)
     dates = sorted(set(m_par_date) & set(t_par_date))
     d1 = serie_cumulee(d1_cumule(fills), sorted(m_par_date))
     lignes = []
     for d in dates:
         m, t = m_par_date[d], t_par_date[d]
         eq_m, eq_t = f(m["capitaux_propres_eur"]), f(t.get("capitaux_propres_eur"))
-        total = eq_t - eq_m
+        imp_m, imp_t = f(m.get("pfu_du_eur")), f(t.get("impot_estime_eur"))
+        net_m, net_t = eq_m - imp_m, eq_t - imp_t
+        total = net_t - net_m
         # D3 : coûts que le mesureur comptabilise et que le trader n'a pas retenus
         d3, detail3 = 0.0, {}
         for col, nom in POSTES:
             ecart = f(m.get(col)) - f(t.get(col))
             detail3[nom] = round(ecart, 2)
             d3 += ecart
-        impot_ecart = f(m.get("pfu_du_eur")) - f(t.get("impot_estime_eur"))
-        detail3["impot"] = round(impot_ecart, 2)
-        d3 += impot_ecart
-        # D2 : valorisation des positions
-        d2 = f(t.get("valeur_positions_eur")) - f(m.get("valeur_positions_eur"))
+        detail3["impot"] = round(imp_m - imp_t, 2)
+        d3 += imp_m - imp_t
+        # D2 : valorisation — par position si le trader a publié ses marques, sinon en agrégat
+        if d in tp and d in mp:
+            d2, manquants = d2_par_position(list(tp[d].values()), mp[d])
+            methode = "par_position" + (f" (sans marque mesurée : {'|'.join(manquants)})" if manquants else "")
+        else:
+            d2 = f(t.get("valeur_positions_eur")) - f(m.get("valeur_positions_eur"))
+            methode = "agregat"
         d1_j = d1.get(d, 0.0)
         d4 = total - d1_j - d2 - d3
         lignes.append({
             "date": d,
             "capitaux_declares_eur": round(eq_t, 2),
             "capitaux_mesures_eur": round(eq_m, 2),
+            "impot_declare_eur": round(imp_t, 2),
+            "impot_mesure_eur": round(imp_m, 2),
+            "capitaux_declares_nets_eur": round(net_t, 2),
+            "capitaux_mesures_nets_eur": round(net_m, 2),
             "divergence_eur": round(total, 2),
-            "divergence_pct_des_capitaux_mesures": round(100 * total / eq_m, 3) if eq_m else None,
+            "divergence_pct_des_capitaux_mesures": round(100 * total / net_m, 3) if net_m else None,
             "D1_hypotheses_execution_eur": round(d1_j, 2),
             "D2_valorisation_eur": round(d2, 2),
+            "D2_methode": methode,
             "D3_couts_omis_eur": round(d3, 2),
             "D3_detail": ";".join(f"{k}={v}" for k, v in detail3.items()),
             "D4_arithmetique_eur": round(d4, 2),
-            "depasse_25_pct": "oui" if eq_m and abs(total) > 0.25 * abs(eq_m) else "non",
+            "depasse_25_pct": "oui" if net_m and abs(total) > 0.25 * abs(net_m) else "non",
         })
     return lignes
 
@@ -171,14 +229,14 @@ def main():
     trader = lire(os.path.join(R, "data", "trader-ledger.csv"))
     mesure = lire(os.path.join(R, "data", "equity.csv"))
     fills = lire(os.path.join(R, "data", "fills.csv"))
+    t_positions = lire(os.path.join(R, "data", "trader-positions.csv"))
+    m_positions = lire(os.path.join(R, "data", "positions.csv"))
     if not trader or not mesure:
         print("Réconciliation impossible : il manque la comptabilité du trader ou celle du mesureur.")
         print(f"  trader-ledger.csv : {len(trader)} lignes · equity.csv : {len(mesure)} lignes")
         return
-    lignes = reconcilier(trader, mesure, fills)
-    cols = ["date", "capitaux_declares_eur", "capitaux_mesures_eur", "divergence_eur",
-            "divergence_pct_des_capitaux_mesures", "D1_hypotheses_execution_eur", "D2_valorisation_eur",
-            "D3_couts_omis_eur", "D3_detail", "D4_arithmetique_eur", "depasse_25_pct"]
+    lignes = reconcilier(trader, mesure, fills, t_positions, m_positions)
+    cols = FMT.RECONCILIATION
     os.makedirs(os.path.join(R, "data"), exist_ok=True)
     with open(os.path.join(R, "data", "reconciliation.csv"), "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=cols, extrasaction="ignore")
@@ -189,6 +247,8 @@ def main():
     md = [f"# Réconciliation B5 — au {fin['date']}", "",
           f"**Capitaux propres déclarés par le trader : {fin['capitaux_declares_eur']:,.0f} €**".replace(",", " "),
           f"**Capitaux propres mesurés indépendamment : {fin['capitaux_mesures_eur']:,.0f} €**".replace(",", " "),
+          f"Nets d'impôt : {fin['capitaux_declares_nets_eur']:,.0f} € déclarés · "
+          f"{fin['capitaux_mesures_nets_eur']:,.0f} € mesurés".replace(",", " "),
           f"**Divergence : {fin['divergence_eur']:+,.0f} €**, soit "
           f"{fin['divergence_pct_des_capitaux_mesures']} % des capitaux mesurés. "
           f"Un signe positif est un avantage que le trader s'attribue.".replace(",", " "), "",

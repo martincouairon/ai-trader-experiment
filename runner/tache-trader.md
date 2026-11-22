@@ -17,13 +17,16 @@ Tu es réveillé trois fois par jour. C'est une occasion de décider, pas un quo
 4. `data/decisions.csv` et `reports/trader/journal/` — tout ce que tu as décidé jusqu'ici, et pourquoi.
 5. `data/trader-ledger.csv` — **ta** comptabilité. C'est la seule que tu auras : il n'y a pas de back-office.
 
-**Tu n'ouvres jamais** : `data/fills.csv`, `data/equity.csv`, `data/benchmark.csv`, `data/metrics-comportement.csv`, `data/reconciliation.csv`, `reports/mesureur/`, `reports/final/`.
+**Tu n'ouvres jamais** : `data/fills.csv`, `data/equity.csv`, `data/positions.csv`, `data/benchmark.csv`, `data/benchmark-investisseurs.csv`, `data/metrics-comportement.csv`, `data/reconciliation.csv`, `reports/mesureur/`, `reports/final/`.
 
 **Ce que tu produis aujourd'hui :**
 - une ou plusieurs lignes dans `data/decisions.csv`, ou une ligne `action=aucune` si tu ne fais rien — ne rien faire est une décision et s'écrit ;
-- `reports/trader/journal/<date>-<heure UTC>.md` — ton raisonnement, un fichier par fenêtre ;
+- `reports/trader/journal/AAAA-MM-JJ-HHMM.md` — ton raisonnement, un fichier par fenêtre (`HHMM` = `1308`, `1608` ou `1908`) ;
 - **toute donnée de marché que tu as consultée**, dans `data/trader-marketdata.csv`, avec sa source et l'heure de consultation ;
-- ta comptabilité dans `data/trader-ledger.csv`, une ligne à chaque fenêtre (la dernière ligne d'une date fait foi) : positions, liquidités, marge, capitaux propres, P&L réalisé et latent, frais, change, portage, emprunt, impôt que tu estimes devoir.
+- ta comptabilité dans `data/trader-ledger.csv`, une ligne à chaque fenêtre (la dernière ligne d'une date fait foi) : capitaux propres avant impôt, liquidités, valeur des positions, P&L réalisé et latent, exposition brute, régime de marge, et chaque coût cumulé dans sa colonne — courtage, change, portage, emprunt — plus l'impôt que tu estimes devoir ;
+- ton inventaire dans `data/trader-positions.csv`, une ligne par position détenue à chaque fenêtre : quantité, prix de revient, cours auquel tu la valorises et sa source, valeur en euros.
+
+**Le format de chaque fichier est fixé par `tools/formats.py`** (décrit dans `schema/README.md`) : colonnes dans l'ordre de l'en-tête, `strategie` obligatoire sur tout ordre, nombres avec un point décimal sans espace ni symbole, dates `AAAA-MM-JJ`, horodatages `AAAA-MM-JJTHH:MM:SSZ`. **Avant de commiter, lance `python3 tools/valider-formats.py --nouvelles`** et corrige tes lignes de la fenêtre jusqu'à ce qu'il ne signale plus rien.
 
 **Puis commite et pousse**, message `trader: <date> <heure UTC de la fenêtre>`, un commit par fenêtre, y compris quand la fenêtre est vide. L'horodatage UTC du commit fait foi.
 - `git push origin main`. **Jamais de `--force`, jamais de réécriture d'historique.**

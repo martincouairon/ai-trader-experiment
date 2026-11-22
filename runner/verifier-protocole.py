@@ -15,9 +15,10 @@ Usage : python3 runner/verifier-protocole.py [--racine .]
 """
 import argparse, csv, os, re, subprocess, sys
 
-INTERDITS_AU_MESUREUR = ("data/trader-ledger.csv", "data/trader-marketdata.csv",
+INTERDITS_AU_MESUREUR = ("data/trader-ledger.csv", "data/trader-marketdata.csv", "data/trader-positions.csv",
                          "data/charte-trader.md", "reports/trader/")
 DONNEES_APPEND_ONLY = ("data/decisions.csv", "data/trader-ledger.csv", "data/trader-marketdata.csv",
+                       "data/trader-positions.csv",
                        "data/prices.csv", "data/regime-marge.csv")
 MOTS_DE_PREDICTION = (r"\bje pr[ée]dis\b", r"\bprobabilit[ée] d[ée]pos[ée]e\b", r"\bje m'attends\b",
                       r"\bmon niveau d[ée]pos[ée]\b", r"\bpr[ée]diction", r"\bje parie\b")
@@ -188,13 +189,27 @@ def c6_aucun_ordre(R, rap):
            "les seules mentions sont des interdictions explicites")
 
 
+def c7_formats(R, rap):
+    """Toutes les lignes de données respectent tools/formats.py. Une ligne publiée hors format
+    reste hors format pour toujours (append-only) : ce contrôle le dit, il ne la corrige pas."""
+    script = os.path.join(R, "tools", "valider-formats.py")
+    if not os.path.exists(script):
+        return rap.na("7 · Formats de données", "tools/valider-formats.py absent")
+    res = subprocess.run([sys.executable, script, "--racine", R], capture_output=True, text=True)
+    if res.returncode == 0:
+        return rap.ok("7 · Formats de données", "toutes les lignes respectent tools/formats.py")
+    ecarts = [l.strip()[2:] for l in res.stdout.splitlines() if l.strip().startswith("- ")]
+    rap.ko("7 · Formats de données", f"{len(ecarts)} écart(s), dont : " + " · ".join(ecarts[:3]))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--racine", default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     a = ap.parse_args()
     rap = Rapport()
     print("Vérification de l'intégrité du protocole\n")
-    for fn in (c1_prereg_figee, c2_append_only, c3_entetes, c4_neutralite, c5_aveuglement, c6_aucun_ordre):
+    for fn in (c1_prereg_figee, c2_append_only, c3_entetes, c4_neutralite, c5_aveuglement, c6_aucun_ordre,
+               c7_formats):
         fn(a.racine, rap)
     print("\n".join(rap.lignes))
     print()

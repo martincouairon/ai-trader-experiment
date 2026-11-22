@@ -6,16 +6,27 @@ Toutes les conventions sont celles de PRE-REGISTRATION.md §5. Aucun agent ne
 recalcule à la main un chiffre produit ici. Bibliothèque standard uniquement.
 
 Entrées  : data/decisions.csv (registre d'ordres)  ·  data/prices.csv (prix sourcés)
-Sorties  : data/fills.csv · data/equity.csv · data/benchmark.csv
-           data/metrics-comportement.csv · reports/mesureur/mesure-<date>.md
+Sorties  : data/fills.csv · data/equity.csv · data/positions.csv · data/benchmark.csv
+           data/benchmark-investisseurs.csv · data/metrics-comportement.csv
+           reports/mesureur/mesure-<date>.md
+Formats  : tools/formats.py (en-têtes exacts), contrôlés par tools/valider-formats.py
+
+Coûts et impôt suivis, en cumul quotidien dans equity.csv : courtage, change,
+glissement (en euros, et non plus seulement en points de base), portage, emprunt de
+titres, coût des liquidations forcées, et PFU dû par année civile avec report des
+moins-values. Le PFU latent (dû si tout était liquidé le jour même) est publié à
+part : il permet une comparaison nette d'impôt avec un indice qu'on ne vend pas.
 
 Ce script NE LIT JAMAIS data/trader-ledger.csv, data/charte-trader.md ni reports/trader/.
 L'aveuglement est une propriété du protocole, pas une omission.
 
 Usage : python3 tools/mesure.py [--racine .] [--jusqua AAAA-MM-JJ]
 """
-import argparse, csv, json, math, os
+import argparse, csv, json, math, os, sys
 from datetime import date, datetime, timedelta
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import formats as FMT  # noqa: E402  — en-têtes canoniques, voir tools/formats.py
 
 # ----------------------------------------------------------------- conventions (PRE-REGISTRATION §5)
 CAPITAL_INITIAL_EUR = 120_000.0
@@ -260,6 +271,7 @@ def executer(decisions, prix):
             "prix_suppose_trader": f(r.get("prix_suppose"), None),
             "multiplicateur": mult, "notionnel_sous_jacent": notionnel,
             "id_position": (r.get("id_position") or "").strip(),
+            "strategie": (r.get("strategie") or "").strip(),
         }
         if inst in ("option", "future") and not notionnel and act in ("ouvrir", "renforcer", "inverser"):
             fills.append({**base, "statut": "non_execute",
@@ -293,6 +305,10 @@ def executer(decisions, prix):
         montant_eur = montant_dev / fx if devise != "EUR" else montant_dev
         glissement_applique = ("marche" in type_ordre.lower() or "stop" in type_ordre.lower()
                                or not limite)
+        # glissement en euros : écart entre le prix servi et le même prix sans glissement
+        adv = (1 + pb / 10_000.0) if achat else (1 - pb / 10_000.0)
+        glissement_eur = (abs(px - px / adv) * q * mult / (fx if devise != "EUR" else 1.0)
+                          if glissement_applique else 0.0)
         fills.append({**base, "statut": "execute", "date_execution": d_fill,
                       "sessions_testees": sessions.index((d_fill, bar)) + 1,
                       "prix_ouverture": round(bar["ouverture"], 6),
@@ -301,6 +317,7 @@ def executer(decisions, prix):
                       "montant_devise": round(montant_dev, 2), "fx": round(fx, 6),
                       "montant_eur": round(montant_eur, 2),
                       "courtage_eur": courtage, "change_eur": change,
+                      "glissement_eur": round(glissement_eur, 4),
                       "cout_total_eur": round(courtage + change, 4),
                       "ecart_prix_suppose_pct": (round(100 * (px - f(r.get("prix_suppose"), px)) / px, 4)
                                                  if f(r.get("prix_suppose"), None) else None),
@@ -365,8 +382,6 @@ def derouler(fills, prix, jusqua, declarations=None):
     Les futures sont tenus en marge de variation : aucun décaissement à l'entrée,
     la variation quotidienne passe en trésorerie, la position ne porte pas de valeur."""
     executes = sorted([x for x in fills if x["statut"] == "execute"], key=lambda x: x["date_execution"])
-    if not executes:
-        return [], []
     d0, d1 = jour(DATE_DEBUT), jour(jusqua)
     par_jour = {}
     for x in executes:
@@ -376,7 +391,9 @@ def derouler(fills, prix, jusqua, declarations=None):
     cash = CAPITAL_INITIAL_EUR
     pv_realisee = 0.0
     frais_cum = change_cum = portage_cum = emprunt_cum = 0.0
-    lignes, evenements = [], []
+    glissement_cum = liquidation_cum = 0.0
+    pv_par_annee, frais_par_annee = {}, {}   # base du PFU, année civile par année civile
+    lignes, evenements, instantanes = [], [], []
     liquidation_en_attente = 0.0        # fraction à liquider à l'ouverture suivante
     nb_appels = 0
     declarations = declarations or []
@@ -386,6 +403,7 @@ def derouler(fills, prix, jusqua, declarations=None):
     def appliquer(x, q_signee, pr):
         """Applique un mouvement de q_signee unités au prix unitaire pr (devise), frais inclus hors."""
         nonlocal cash, pv_realisee
+        annee = str(x.get("date_execution") or x.get("_date") or "")[:4]
         tk, inst = x["ticker"], x["instrument"]
         cle = cle_position(x)
         mult = f(x.get("multiplicateur"), 1.0) or 1.0
@@ -394,6 +412,8 @@ def derouler(fills, prix, jusqua, declarations=None):
                                 "inst": inst, "sens": x["sens"], "mult": mult,
                                 "notionnel_u": (f(x.get("notionnel_sous_jacent"), 0.0) / abs(f(x.get("quantite"), 1.0) or 1.0)),
                                 "dernier_px": pr})
+        if x.get("strategie") and x.get("action") in ("ouvrir", "renforcer", "inverser"):
+            p["strategie"] = x["strategie"]
         montant_eur = pr * abs(q_signee) * mult / fx
         if inst == "future":
             p["q"] += q_signee            # pas de décaissement : marge de variation
@@ -406,9 +426,15 @@ def derouler(fills, prix, jusqua, declarations=None):
             pru_unitaire = p["cout_eur"] / p["q"]          # € par unité, signé comme la position
             qf = min(abs(q_signee), abs(p["q"]))
             signe_pos = 1 if p["q"] > 0 else -1
-            pv_realisee += ((pr * mult / fx) - pru_unitaire * signe_pos) * qf * signe_pos
+            pv_op = ((pr * mult / fx) - pru_unitaire * signe_pos) * qf * signe_pos
+            pv_realisee += pv_op
+            pv_par_annee[annee] = pv_par_annee.get(annee, 0.0) + pv_op
             p["cout_eur"] -= pru_unitaire * qf * signe_pos
             p["q"] += q_signee
+        if abs(p["q"]) < 1e-6:
+            # position soldée : on efface le résidu de virgule flottante, sinon une réouverture
+            # hériterait d'un prix de revient faux et d'une plus-value fantôme
+            p["q"], p["cout_eur"] = 0.0, 0.0
         cash -= montant_eur * (1 if q_signee > 0 else -1)
 
     d = d0
@@ -445,11 +471,16 @@ def derouler(fills, prix, jusqua, declarations=None):
                 faux = {"id_position": cle, "ticker": p["ticker"], "instrument": p["inst"],
                         "sens": p["sens"], "devise": p["devise"],
                         "place": p["place"], "multiplicateur": p["mult"], "fx": fx,
-                        "quantite": abs(qliq), "notionnel_sous_jacent": p["notionnel_u"] * abs(qliq)}
+                        "quantite": abs(qliq), "notionnel_sous_jacent": p["notionnel_u"] * abs(qliq),
+                        "_date": ds}
                 appliquer(faux, -qliq, pxl)
                 cash -= c + ch
                 frais_cum += c
                 change_cum += ch
+                g = abs(pxl - px_ouv) * abs(qliq) * p["mult"] / fx
+                glissement_cum += g
+                liquidation_cum += c + ch + g
+                frais_par_annee[ds[:4]] = frais_par_annee.get(ds[:4], 0.0) + c + ch
                 detail.append(f"{cle} −{abs(qliq):.4g} à {pxl:.4f}")
             evenements.append({"date": ds, "type": "liquidation_forcee",
                                "detail": f"appel de marge : {k*100:.1f} % de chaque position liquidée à l'ouverture · "
@@ -467,15 +498,37 @@ def derouler(fills, prix, jusqua, declarations=None):
                                    "detail": f"{x['id_decision']} {x['ticker']} — {x['motif']}"})
                 continue
             signe = 1 if x["sens_economique"] == "achat" else -1
+            if x["action"] in ("reduire", "fermer"):
+                # On ne réduit que ce qu'on détient : une réduction ne retourne jamais une position.
+                # Sans ce plafond, « réduire » une ligne absente ouvrirait une vente à découvert
+                # que le régime de marge n'aurait jamais contrôlée.
+                detenu = pos.get(cle_position(x), {}).get("q", 0.0)
+                du_bon_cote = detenu * (1 if x["sens"] == "long" else -1)
+                if du_bon_cote <= 1e-9:
+                    x["statut"] = "non_execute"
+                    x["motif"] = f"aucune position {x['sens']} à {x['action']} sur {x['ticker']}"
+                    evenements.append({"date": ds, "type": "ordre_sans_objet",
+                                       "detail": f"{x['id_decision']} {x['ticker']} — {x['motif']}"})
+                    continue
+                if x["quantite"] > du_bon_cote + 1e-9:
+                    evenements.append({"date": ds, "type": "quantite_plafonnee",
+                                       "detail": f"{x['id_decision']} {x['ticker']} — {x['action']} "
+                                                 f"{x['quantite']:g} demandé, {du_bon_cote:g} détenu"})
+                    k = du_bon_cote / x["quantite"]
+                    for c in ("quantite", "montant_devise", "montant_eur", "courtage_eur", "change_eur",
+                              "glissement_eur", "cout_total_eur"):
+                        x[c] = round(f(x.get(c)) * k, 6)
             appliquer(x, signe * x["quantite"], x["prix_execution"])
             cash -= x["cout_total_eur"]
             frais_cum += x["courtage_eur"]
             change_cum += x["change_eur"]
+            glissement_cum += f(x.get("glissement_eur"))
+            frais_par_annee[ds[:4]] = frais_par_annee.get(ds[:4], 0.0) + x["cout_total_eur"]
 
         # --- valorisation, marge, portage
         brut_long = brut_short = 0.0
         exig_maint = exig_init = 0.0
-        poids, manquants = [], []
+        poids, manquants, lignes_jour = [], [], []
         for cle, p in list(pos.items()):
             if abs(p["q"]) < 1e-9:
                 continue
@@ -498,6 +551,16 @@ def derouler(fills, prix, jusqua, declarations=None):
             exig_init += exigence(regime, p["inst"], sens, abs(val), notion_eur, "initiale", equity_veille)[0]
             if val or p["inst"] == "future":
                 poids.append(abs(val) if val else notion_eur)
+            lignes_jour.append({"date": ds, "ticker": p["ticker"], "id_position": cle, "instrument": p["inst"],
+                                "sens": "long" if p["q"] > 0 else "short", "place": p["place"],
+                                "devise": p["devise"], "quantite": round(abs(p["q"]), 6),
+                                "multiplicateur": p["mult"], "cours": px, "date_cours": dd,
+                                "fx_eurusd": round(fx, 6) if p["devise"] == "USD" else "",
+                                "valeur_eur": round(val, 2),
+                                "exposition_eur": round(abs(val) if val else notion_eur, 2),
+                                "prix_revient_eur": round(p["cout_eur"], 2) if p["inst"] != "future" else "",
+                                "pv_latente_eur": round(val - p["cout_eur"], 2) if p["inst"] != "future" else "",
+                                "strategie": p.get("strategie", "")})
             if val >= 0:
                 brut_long += val
             else:
@@ -518,7 +581,23 @@ def derouler(fills, prix, jusqua, declarations=None):
             for p in pos.values() if p["inst"] == "future" and abs(p["q"]) > 1e-9)
         total_poids = sum(poids) or 1.0
         hhi = sum((w / total_poids) ** 2 for w in poids) if poids else 0.0
+        for l in lignes_jour:
+            l["poids_pct"] = round(100 * l["exposition_eur"] / total_poids, 3) if poids else 0.0
+        instantanes += lignes_jour
 
+        # --- impôt : PFU par année civile, moins-values reportées sur les années suivantes
+        #     (10 ans en droit français, sans effet sur une expérience de 12 mois).
+        #     Base = plus-values réalisées − courtage et change de l'année (frais déductibles).
+        pfu_du, report = 0.0, 0.0
+        for an in sorted(set(pv_par_annee) | set(frais_par_annee)):
+            base = pv_par_annee.get(an, 0.0) - frais_par_annee.get(an, 0.0) - report
+            if base > 0:
+                pfu_du += base * PFU
+                report = 0.0
+            else:
+                report = -base
+        pv_latente = sum(l["pv_latente_eur"] for l in lignes_jour if l["pv_latente_eur"] != "")
+        pfu_latent = max(0.0, pv_latente - report) * PFU
         appel = capitaux < exig_maint and exig_maint > 0
         if appel:
             nb_appels += 1
@@ -539,11 +618,18 @@ def derouler(fills, prix, jusqua, declarations=None):
             "marge_disponible_eur": round(capitaux - exig_maint, 2),
             "appel_de_marge": "oui" if appel else "non",
             "pv_realisee_cumulee_eur": round(pv_realisee, 2),
-            "pfu_du_eur": round(max(0.0, pv_realisee) * PFU, 2),
-            "capitaux_propres_net_pfu_eur": round(capitaux - max(0.0, pv_realisee) * PFU, 2),
+            "pv_latente_eur": round(pv_latente, 2),
+            "pfu_du_eur": round(pfu_du, 2),
+            "pfu_latent_eur": round(pfu_latent, 2),
+            "capitaux_propres_net_pfu_eur": round(capitaux - pfu_du, 2),
+            "capitaux_liquidatifs_nets_eur": round(capitaux - pfu_du - pfu_latent, 2),
+            "exposition_nette_eur": round(brut_long - brut_short, 2),
             "frais_cumules_eur": round(frais_cum, 2), "change_cumule_eur": round(change_cum, 2),
+            "glissement_cumule_eur": round(glissement_cum, 2),
             "portage_cumule_eur": round(portage_cum, 2), "emprunt_cumule_eur": round(emprunt_cum, 2),
-            "friction_totale_cumulee_eur": round(frais_cum + change_cum + portage_cum + emprunt_cum, 2),
+            "liquidations_cout_cumule_eur": round(liquidation_cum, 2),
+            "friction_totale_cumulee_eur": round(frais_cum + change_cum + glissement_cum
+                                                 + portage_cum + emprunt_cum, 2),
             "nb_lignes": sum(1 for p in pos.values() if abs(p["q"]) > 1e-9),
             "hhi": round(hhi, 4),
             "poids_premiere_ligne_pct": round(100 * max(poids) / total_poids, 2) if poids else 0.0,
@@ -557,7 +643,7 @@ def derouler(fills, prix, jusqua, declarations=None):
             evenements.append({"date": ds, "type": "seuil_arret",
                                "detail": f"capitaux propres {capitaux:.0f} € < 24 000 € (§8 du pré-enregistrement)"})
         d += timedelta(days=1)
-    return lignes, evenements
+    return lignes, evenements, instantanes
 
 
 # ----------------------------------------------------------------- références
@@ -597,11 +683,43 @@ def benchmark(equity, prix, jusqua):
         row["livret_a_eur"] = round(v_liv, 2)
         row["ecart_vs_livret_eur"] = round(ligne["capitaux_propres_eur"] - v_liv, 2)
         iwda = row.get("iwda_flux_identiques_eur")
+        # même convention d'impôt que capitaux_liquidatifs_nets_eur : PFU sur la plus-value latente
+        row["iwda_liquidatif_net_eur"] = (round(iwda - max(0.0, iwda - CAPITAL_INITIAL_EUR) * PFU, 2)
+                                          if iwda else None)
         for r in ("cw8", "wpea"):
             vr = row.get(f"{r}_flux_identiques_eur")
             row[f"ecart_{r}_vs_iwda_pct"] = (round(100 * (vr - iwda) / iwda, 3)
                                              if (iwda and vr) else None)
         out.append(row)
+    return out
+
+
+def benchmark_investisseurs(equity, prix):
+    """EXPLORATOIRE, non pré-enregistré. Véhicules cotés d'investisseurs connus,
+    120 000 € investis le premier jour, convertis en euros au change du jour.
+    Un véhicule absent de prices.csv est simplement absent : jamais approché."""
+    out = []
+    if not equity:
+        return out
+    for tk, (nom, vehicule) in FMT.INVESTISSEURS.items():
+        dates = [d for d in prix.dates(tk) if jour(d) >= jour(DATE_DEBUT) and prix.bar(tk, d)["cloture"]]
+        if not dates:
+            continue
+        b0 = prix.bar(tk, dates[0])
+        dev = b0["devise"]
+        if dev not in ("EUR", "USD"):
+            continue                                   # seule la conversion EUR/USD est mesurée
+        fx0 = prix.taux(dates[0]) if dev == "USD" else 1.0
+        parts = CAPITAL_INITIAL_EUR * fx0 / b0["cloture"]
+        for ligne in equity:
+            ds = ligne["date"]
+            dd, bar = prix.derniere_cloture(tk, ds)
+            if not bar or jour(dd) < jour(dates[0]):
+                continue
+            fx = prix.taux(ds) if dev == "USD" else 1.0
+            out.append({"date": ds, "ticker": tk, "investisseur": nom, "vehicule": vehicule, "devise": dev,
+                        "cours": bar["cloture"], "valeur_flux_identiques_eur": round(parts * bar["cloture"] / fx, 2),
+                        "qualite": bar["qualite"]})
     return out
 
 
@@ -702,8 +820,9 @@ def note_md(equity, bench, metrics, fills, evenements, jusqua):
           f"{e['appel_de_marge']}".replace(",", " "),
           f"**Friction cumulée {e['friction_totale_cumulee_eur']:,.0f} €** "
           f"(courtage {e['frais_cumules_eur']} · change {e['change_cumule_eur']} · "
-          f"portage {e['portage_cumule_eur']} · emprunt {e['emprunt_cumule_eur']}) · "
-          f"PFU dû {e['pfu_du_eur']} €".replace(",", " "), ""]
+          f"glissement {e['glissement_cumule_eur']} · portage {e['portage_cumule_eur']} · "
+          f"emprunt {e['emprunt_cumule_eur']} · dont liquidations forcées {e['liquidations_cout_cumule_eur']}) · "
+          f"PFU dû {e['pfu_du_eur']} € · PFU latent {e['pfu_latent_eur']} €".replace(",", " "), ""]
     if bench:
         b = bench[-1]
         L += ["## Références — un rendement sans référence ne veut rien dire",
@@ -756,32 +875,17 @@ def main():
     declarations = lire(os.path.join(R, "data", "regime-marge.csv"))
 
     fills = executer(decisions, prix)
-    equity, evenements = derouler(fills, prix, a.jusqua, declarations)
+    equity, evenements, positions = derouler(fills, prix, a.jusqua, declarations)
     bench = benchmark(equity, prix, a.jusqua)
+    investisseurs = benchmark_investisseurs(equity, prix)
     metrics = comportement(decisions, fills, equity)
 
-    ecrire(os.path.join(R, "data", "fills.csv"), fills, [
-        "id_decision", "horodatage_decision", "date_execution", "ticker", "instrument", "place", "devise",
-        "action", "sens", "sens_economique", "quantite", "horizon_annonce", "prix_ouverture", "glissement_pb",
-        "id_position", "type_ordre", "limite", "validite", "sessions_testees", "prix_execution",
-        "prix_suppose_trader", "ecart_prix_suppose_pct", "multiplicateur",
-        "notionnel_sous_jacent", "montant_devise", "fx", "montant_eur",
-        "courtage_eur", "change_eur", "cout_total_eur", "statut", "source_prix", "qualite_prix",
-        "detail_frais", "motif"])
-    ecrire(os.path.join(R, "data", "equity.csv"), equity, [
-        "date", "regime_marge", "cash_eur", "valeur_positions_eur", "capitaux_propres_eur",
-        "capitaux_propres_net_pfu_eur",
-        "exposition_brute_eur", "levier_brut", "exigence_initiale_eur", "exigence_maintien_eur",
-        "marge_disponible_eur", "appel_de_marge", "pv_realisee_cumulee_eur", "pfu_du_eur", "frais_cumules_eur",
-        "change_cumule_eur", "portage_cumule_eur", "emprunt_cumule_eur", "friction_totale_cumulee_eur",
-        "nb_lignes", "hhi", "poids_premiere_ligne_pct", "perf_depuis_debut_pct", "cours_manquants"])
-    ecrire(os.path.join(R, "data", "benchmark.csv"), bench, [
-        "date", "capitaux_propres_eur", "capitaux_propres_net_pfu_eur",
-        "iwda_flux_identiques_eur", "ecart_vs_iwda_eur", "ecart_net_vs_iwda_eur",
-        "cw8_flux_identiques_eur", "ecart_vs_cw8_eur", "ecart_net_vs_cw8_eur", "ecart_cw8_vs_iwda_pct",
-        "wpea_flux_identiques_eur", "ecart_vs_wpea_eur", "ecart_net_vs_wpea_eur", "ecart_wpea_vs_iwda_pct",
-        "livret_a_eur", "ecart_vs_livret_eur"])
-    ecrire(os.path.join(R, "data", "metrics-comportement.csv"), metrics, ["indicateur", "valeur", "n", "note"])
+    ecrire(os.path.join(R, "data", "fills.csv"), fills, FMT.FILLS)
+    ecrire(os.path.join(R, "data", "equity.csv"), equity, FMT.EQUITY)
+    ecrire(os.path.join(R, "data", "positions.csv"), positions, FMT.POSITIONS)
+    ecrire(os.path.join(R, "data", "benchmark.csv"), bench, FMT.BENCHMARK)
+    ecrire(os.path.join(R, "data", "benchmark-investisseurs.csv"), investisseurs, FMT.BENCHMARK_INVESTISSEURS)
+    ecrire(os.path.join(R, "data", "metrics-comportement.csv"), metrics, FMT.METRICS)
 
     note = note_md(equity, bench, metrics, fills, evenements, a.jusqua)
     chemin = os.path.join(R, "reports", "mesureur", f"mesure-{a.jusqua}.md")

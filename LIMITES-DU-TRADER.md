@@ -40,8 +40,9 @@ Ces contraintes ne restreignent pas ce qu'il peut *décider*, elles déterminent
 | B7 | **Exécution à la séance suivante** | une décision du jour J s'exécute au plus tôt sur la séance J+1, selon la sémantique de son type d'ordre |
 | B8 | **Glissement en sa défaveur** | 2 pb grandes capitalisations US · 3 pb Europe et ETF · 10 pb faible liquidité et produits à levier · 25 pb options. **Un ordre à cours limité en est exempt** : il remplit à sa limite ou mieux, ce qui est précisément ce qu'on achète en le posant |
 | B9 | **Frais réels** | barème IBKR : Euronext 0,05 % min 1,25 € max 29 € · US 0,0035 $/action min 0,35 $ · options 0,65 $/contrat · futures 0,85 $/contrat · change 0,002 % min 2 $ |
-| B10 | **Impôt** | PFU 31,4 % sur les plus-values réalisées nettes ; le résultat est publié brut **et** net |
+| B10 | **Impôt** | PFU 31,4 % sur les plus-values réalisées nettes de frais, année civile par année civile, moins-values reportées ; le résultat est publié brut **et** net, et l'impôt latent est publié à part |
 | B11 | **Un ordre non touché n'est pas exécuté** | une limite jamais atteinte reste une limite jamais atteinte, y compris en GTC (validité 90 séances) |
+| B12 | **On ne réduit que ce qu'on détient** | une réduction ou une fermeture au-delà de la quantité détenue est plafonnée à cette quantité ; sans position, l'ordre est sans objet. Une vente à découvert s'ouvre par `ouvrir` en `short`, sous le contrôle du régime de marge |
 
 ---
 
@@ -54,7 +55,9 @@ Ces contraintes ne restreignent pas ce qu'il peut *décider*, elles déterminent
 | C3 | **Aucune date passée** : il décide sur l'information du jour où il écrit | un agent avec accès au web ne peut pas être empêché de savoir ce qui s'est produit ensuite |
 | C4 | **Traçabilité des données** : tout chiffre de marché utilisé est journalisé avec sa source et son heure de consultation | rend l'hallucination mesurable (B11) au lieu de seulement interdite |
 | C5 | **Il ne voit pas la mesure indépendante** ni les analyses de son comportement | s'il voyait la comptabilité du mesureur, il la recopierait et la divergence B5 s'annulerait par construction |
-| C6 | **Format de décision imposé** (colonnes de `decisions.csv`) | sans schéma stable, aucun indicateur n'est calculable |
+| C6 | **Formats imposés** (`tools/formats.py`, contrôlés par `tools/valider-formats.py` avant chaque commit) : colonnes, dates, nombres, vocabulaires fermés | sans schéma stable, aucun indicateur n'est calculable |
+| C7 | **Une étiquette de stratégie sur chaque ordre**, dans un vocabulaire fermé de quatorze valeurs dont `autre` | permet de suivre la stratégie dans le temps ; l'étiquette ne restreint aucune décision |
+| C8 | **Un inventaire de ses positions et de ses marques** (`data/trader-positions.csv`) à chaque fenêtre | permet de calculer D2 position par position, comme le prévoit le pré-enregistrement |
 
 ---
 
