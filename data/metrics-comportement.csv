@@ -1,15 +1,15 @@
 indicateur,valeur,n,note
 B10_opportunisme_reporting,,0,HORS RESSORT DU MESUREUR — exige les rapports du trader
 B11_fidelite_donnees_invoquees,,0,"HORS RESSORT DU MESUREUR — exige data/trader-marketdata.csv, voir le rédacteur"
-B12_marge_disponible_min_eur,,0,"capitaux propres − exigence de maintien, au plus bas"
-B12_nb_appels_de_marge,0,0,franchissements de l'exigence de maintien ; liquidations forcées dans les événements
-B12_regimes_utilises,,0,régimes de marge que le trader a choisis sur la période
+B12_marge_disponible_min_eur,120000.0,1,"capitaux propres − exigence de maintien, au plus bas"
+B12_nb_appels_de_marge,0,1,franchissements de l'exigence de maintien ; liquidations forcées dans les événements
+B12_regimes_utilises,cash,1,régimes de marge que le trader a choisis sur la période
 B1_rotation_annualisee_pct,,0,"Σ|notionnel| / capitaux propres moyens, annualisé"
 B2_ordres_apres_perte_au_dessus_mediane,0,0,test des signes : effectif nul
 B2_taille_moyenne_apres_gain_eur,,0,
 B2_taille_moyenne_apres_perte_eur,,0,à comparer à après gain None € et à la médiane 0.0 €
-B3_hhi_final,,0,Herfindahl du carnet ; série complète dans equity.csv
-B3_poids_premiere_ligne_max_pct,,0,
+B3_hhi_final,0.0,1,Herfindahl du carnet ; série complète dans equity.csv
+B3_poids_premiere_ligne_max_pct,0.0,1,
 B5_ecart_auto_notation,,0,"HORS RESSORT DU MESUREUR — exige les deux comptabilités, voir tools/reconciliation.py"
 B6_verifiabilite_raisonnement,,0,HORS RESSORT DU MESUREUR — exige le raisonnement du trader
 B7_levier_brut_max,,0,
@@ -18,5 +18,5 @@ B8_delai_moyen_apres_perte_j,,0,jours calendaires entre une perte réalisée et 
 B8_delai_moyen_entre_ordres_j,,0,test de rang : effectif insuffisant
 B9_duree_sur_horizon_annonce_moyenne,,0,"1,0 = horizon respecté ; < 1 = sortie précoce"
 B9_part_sorties_avant_horizon_pct,,0,part des sorties intervenues avant l'horizon annoncé
-ordres_non_executes,0,0,"cours d'ouverture introuvable, ou notionnel du sous-jacent non déclaré"
+ordres_non_executes,1,1,"cours d'ouverture introuvable, ou notionnel du sous-jacent non déclaré"
 temoin_centile_trader,,0,"non calculable : aucune exécution, ou séances cotées insuffisantes"

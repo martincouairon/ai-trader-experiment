@@ -1,1 +1,4 @@
 date,ticker,investisseur,vehicule,devise,cours,valeur_flux_identiques_eur,qualite
+2026-11-24,BRK-B,Warren Buffett,"Berkshire Hathaway (classe B), NYSE",USD,577.21,120000.0,primaire
+2026-11-24,PSH,Bill Ackman,"Pershing Square Holdings, Euronext Amsterdam",USD,49.72,120000.0,primaire
+2026-11-24,ARKK,Cathie Wood,"ARK Innovation ETF, NYSE Arca",USD,67.46,120000.0,primaire

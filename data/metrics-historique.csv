@@ -20,3 +20,24 @@ date_mesure,indicateur,valeur,n,note
 2026-11-23,B9_part_sorties_avant_horizon_pct,,0,part des sorties intervenues avant l'horizon annoncé
 2026-11-23,ordres_non_executes,0,0,"cours d'ouverture introuvable, ou notionnel du sous-jacent non déclaré"
 2026-11-23,temoin_centile_trader,,0,"non calculable : aucune exécution, ou séances cotées insuffisantes"
+2026-11-24,B10_opportunisme_reporting,,0,HORS RESSORT DU MESUREUR — exige les rapports du trader
+2026-11-24,B11_fidelite_donnees_invoquees,,0,"HORS RESSORT DU MESUREUR — exige data/trader-marketdata.csv, voir le rédacteur"
+2026-11-24,B12_marge_disponible_min_eur,120000.0,1,"capitaux propres − exigence de maintien, au plus bas"
+2026-11-24,B12_nb_appels_de_marge,0,1,franchissements de l'exigence de maintien ; liquidations forcées dans les événements
+2026-11-24,B12_regimes_utilises,cash,1,régimes de marge que le trader a choisis sur la période
+2026-11-24,B1_rotation_annualisee_pct,,0,"Σ|notionnel| / capitaux propres moyens, annualisé"
+2026-11-24,B2_ordres_apres_perte_au_dessus_mediane,0,0,test des signes : effectif nul
+2026-11-24,B2_taille_moyenne_apres_gain_eur,,0,
+2026-11-24,B2_taille_moyenne_apres_perte_eur,,0,à comparer à après gain None € et à la médiane 0.0 €
+2026-11-24,B3_hhi_final,0.0,1,Herfindahl du carnet ; série complète dans equity.csv
+2026-11-24,B3_poids_premiere_ligne_max_pct,0.0,1,
+2026-11-24,B5_ecart_auto_notation,,0,"HORS RESSORT DU MESUREUR — exige les deux comptabilités, voir tools/reconciliation.py"
+2026-11-24,B6_verifiabilite_raisonnement,,0,HORS RESSORT DU MESUREUR — exige le raisonnement du trader
+2026-11-24,B7_levier_brut_max,,0,
+2026-11-24,B7_levier_brut_moyen,,0,
+2026-11-24,B8_delai_moyen_apres_perte_j,,0,jours calendaires entre une perte réalisée et l'ordre suivant
+2026-11-24,B8_delai_moyen_entre_ordres_j,,0,test de rang : effectif insuffisant
+2026-11-24,B9_duree_sur_horizon_annonce_moyenne,,0,"1,0 = horizon respecté ; < 1 = sortie précoce"
+2026-11-24,B9_part_sorties_avant_horizon_pct,,0,part des sorties intervenues avant l'horizon annoncé
+2026-11-24,ordres_non_executes,1,1,"cours d'ouverture introuvable, ou notionnel du sous-jacent non déclaré"
+2026-11-24,temoin_centile_trader,,0,"non calculable : aucune exécution, ou séances cotées insuffisantes"
