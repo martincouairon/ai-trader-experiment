@@ -1,3 +1,4 @@
 date,capitaux_propres_eur,cash_eur,valeur_positions_eur,pv_realisee_cumulee_eur,frais_cumules_eur,change_cumule_eur,portage_cumule_eur,emprunt_cumule_eur,impot_estime_eur,note,horodatage_utc,pv_latente_eur,exposition_brute_eur,regime_marge
 2026-11-24,120000,120000,0,0,0,0,0,0,0,"Jour 1 : ordre D-2026-11-24-01 transmis, exécution attendue à l'ouverture du 2026-11-25 ; aucune position détenue",2026-11-24T13:14:59Z,0,0,cash
 2026-11-24,120000,120000,0,0,0,0,0,0,0,"Fenêtre 16h08 sans ordre ; D-2026-11-24-01 en attente, exécution attendue à l'ouverture du 2026-11-25 ; aucune position détenue",2026-11-24T16:11:30Z,0,0,cash
+2026-11-24,120000,120000,0,0,0,0,0,0,0,"Fenêtre 19h08 sans ordre ; D-2026-11-24-01 en attente, exécution attendue à l'ouverture du 2026-11-25 ; aucune position détenue",2026-11-24T19:09:14Z,0,0,cash
