@@ -1,1 +1,6 @@
 date,horodatage_consultation_utc,instrument,ticker,grandeur,valeur,devise,source,url_ou_reference,usage
+2026-11-24,2026-11-24T13:13:00Z,etf,IWDA,dernier_cours,130.49,EUR,stockanalysis.com (cours différé daté 2026-11-13 17:35 CET),https://stockanalysis.com/quote/ams/IWDA/,écarté : cours périmé de 11 jours
+2026-11-24,2026-11-24T13:14:00Z,etf,IWDA,dernier_cours,128.91,EUR,Google Finance (cours daté 25 sept. sans année),https://www.google.com/finance/quote/IWDA:AMS,écarté : cours périmé
+2026-11-24,2026-11-24T13:14:00Z,etf,IWDA,cloture,126.76,EUR,Twelve Data (dernière mise à jour 23 nov. 17:30 CET),https://twelvedata.com/markets/843380/etf/euronext/iwda,prix supposé de l'achat et base de la limite
+2026-11-24,2026-11-24T13:14:00Z,etf,IWDA,cloture_precedente,122.71,EUR,Twelve Data (séance du 23 nov.),https://twelvedata.com/markets/843380/etf/euronext/iwda,contexte : hausse de 3.30 % le 23 nov.
+2026-11-24,2026-11-24T13:14:00Z,etf,IWDA,ouverture,122.98,EUR,Twelve Data (séance du 23 nov.),https://twelvedata.com/markets/843380/etf/euronext/iwda,contexte
