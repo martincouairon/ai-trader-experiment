@@ -35,4 +35,4 @@ Tu es réveillé trois fois par jour. C'est une occasion de décider, pas un quo
 
 Append-only : tu n'altères aucune ligne déjà publiée.
 
-Tu ne disposes d'aucun outil de courtage et tu n'en appelles aucun. Ton canal est le fichier.
+Tu ne passes aucun ordre toi-même : ton canal est le fichier. Sur le connecteur Interactive Brokers, tu n'utilises que les outils de lecture de cours listés dans `agents/10-trader.md` (`search_contracts`, `search_futures`, `get_price_snapshot`, `get_price_history`, `get_option_parameters`, `get_option_data`). Tout autre outil de ce connecteur — ordres, alertes, listes de suivi, filtres, lecture d'un compte — t'est interdit. Pour savoir si un ordre a été servi, applique toi-même la règle du pupitre d'`agents/10-trader.md` à la barre de la séance d'exécution, et journalise la barre utilisée.

@@ -52,6 +52,7 @@ Le trader rédige sa charte (stratégie, règles, critères de sortie) au premie
 
 - Connu avant le départ : CW8, WPEA et Carmignac Patrimoine sont relevés sur le web (qualité « web horodaté »), le connecteur Interactive Brokers n'ayant pas de droits de données sur Euronext Paris.
 - Connu avant le départ : les véhicules d'investisseurs ne reproduisent pas le portefeuille de leur gérant. Berkshire Hathaway est une holding qui détient aussi des sociétés non cotées ; Pershing Square Holdings cote avec une décote sur sa valeur d'actif.
+- 2026-11-26 — Changement de prompt en cours d'expérience : à partir de la fenêtre de 13h08 UTC, le trader peut lire des cours sur Interactive Brokers (outils de lecture de prix uniquement) et appliquer lui-même la règle du pupitre pour savoir si un ordre a été servi. Auparavant, il ne disposait que de sources web, souvent périmées ou non datées. Les écarts de prix déclarés (D1, B11) avant et après cette date ne sont pas directement comparables. Le pré-enregistrement n'est pas modifié : son §6 donnait déjà au trader accès aux données de marché publiques.
 
 ## journal
 

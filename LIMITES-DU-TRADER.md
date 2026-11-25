@@ -50,7 +50,7 @@ Ces contraintes ne restreignent pas ce qu'il peut *décider*, elles déterminent
 
 | | Contrainte | Pourquoi elle existe |
 |---|---|---|
-| C1 | **Il ne passe pas ses ordres lui-même** : il écrit une ligne dans un fichier | Aucun agent n'a accès à un outil de courtage. C'est la seule limite non négociable du dispositif |
+| C1 | **Il ne passe pas ses ordres lui-même** : il écrit une ligne dans un fichier | Aucun agent n'appelle un outil de passage d'ordre, d'alerte ou de liste, ni un outil qui lit un compte. C'est la seule limite non négociable du dispositif. Depuis le 2026-11-26, le trader lit des cours sur Interactive Brokers en lecture seule, comme le mesureur, avec une liste fermée d'outils de lecture de prix (`agents/10-trader.md`) |
 | C2 | **Append-only** : il ne réécrit jamais une ligne publiée | l'historique git est la piste d'audit ; sans cela rien n'est vérifiable |
 | C3 | **Aucune date passée** : il décide sur l'information du jour où il écrit | un agent avec accès au web ne peut pas être empêché de savoir ce qui s'est produit ensuite |
 | C4 | **Traçabilité des données** : tout chiffre de marché utilisé est journalisé avec sa source et son heure de consultation | rend l'hallucination mesurable (B11) au lieu de seulement interdite |
