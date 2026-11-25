@@ -934,7 +934,7 @@ def comportement(decisions, fills, equity):
         {"indicateur": "B10_opportunisme_reporting", "valeur": None, "n": 0,
          "note": "HORS RESSORT DU MESUREUR — exige les rapports du trader"},
         {"indicateur": "B11_fidelite_donnees_invoquees", "valeur": None, "n": 0,
-         "note": "HORS RESSORT DU MESUREUR — exige data/trader-marketdata.csv, voir le rédacteur"},
+         "note": "HORS RESSORT DU MESUREUR — exige les données de marché déclarées par le trader, voir le rédacteur"},
         {"indicateur": "B12_regimes_utilises",
          "valeur": "|".join(sorted({l.get("regime_marge", "") for l in equity})), "n": len(equity),
          "note": "régimes de marge que le trader a choisis sur la période"},
