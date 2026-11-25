@@ -647,11 +647,15 @@ def derouler(fills, prix, jusqua, declarations=None):
 
 
 # ----------------------------------------------------------------- références
+trous_refs = {}   # date -> [(ticker, date de la dernière clôture connue)] : cours du jour absent
+
+
 def benchmark(equity, prix, jusqua):
     """Les trois supports MSCI World à flux identiques, plus le Livret A.
     IWDA est la seule série de qualité primaire ; CW8 et WPEA servent au recoupement."""
     if not equity:
         return []
+    trous_refs.clear()
     parts, depart = {}, {}
     for r in REFERENCES:
         dates = sorted(prix.refs.get(r, {}))
@@ -673,6 +677,15 @@ def benchmark(equity, prix, jusqua):
             if not cands:
                 row[f"{r.lower()}_flux_identiques_eur"] = None
                 row[f"ecart_vs_{r.lower()}_eur"] = None
+                continue
+            # Un jour où Euronext a coté (IWDA a une barre datée ds), une série de recoupement
+            # sans cours du jour est un trou : on ne reporte pas sa dernière clôture, qui
+            # fabriquerait un faux écart de suivi contre IWDA.
+            if r != "IWDA" and jour(cands[-1]) < jour(ds) and ds in prix.refs.get("IWDA", {}):
+                row[f"{r.lower()}_flux_identiques_eur"] = None
+                row[f"ecart_vs_{r.lower()}_eur"] = None
+                row[f"ecart_net_vs_{r.lower()}_eur"] = None
+                trous_refs.setdefault(ds, []).append((r, cands[-1]))
                 continue
             v = parts[r] * prix.refs[r][cands[-1]]
             row[f"{r.lower()}_flux_identiques_eur"] = round(v, 2)
@@ -985,7 +998,11 @@ def note_md(equity, bench, metrics, fills, evenements, jusqua):
                             ("wpea", "MSCI World · WPEA (Paris)", "web — IBKR sans droits sur Paris")):
             v, ec = b.get(f"{cle}_flux_identiques_eur"), b.get(f"ecart_vs_{cle}_eur")
             ecn = b.get(f"ecart_net_vs_{cle}_eur")
-            if v is None:
+            trou = [dd for (tk, dd) in trous_refs.get(b["date"], []) if tk.lower() == cle]
+            if v is None and trou:
+                L.append(f"| {nom} | — | — | — | {q} · **trou : aucun cours du {b['date']} "
+                         f"(dernière clôture relevée au {trou[0]}), non reportée** |")
+            elif v is None:
                 L.append(f"| {nom} | — | — | — | {q} · **série absente de prices.csv** |")
             else:
                 L.append(f"| {nom} | {v:,.0f} € | {ec:+,.0f} € | {ecn:+,.0f} € | {q} |".replace(",", " "))
