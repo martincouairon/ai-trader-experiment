@@ -1,0 +1,51 @@
+ticker,nom,place,devise,contract_id,rang_capitalisation_2026_11_25
+NVDA,NVIDIA,US,USD,,1
+GOOGL,Alphabet (classe A),US,USD,,2
+AAPL,Apple,US,USD,,3
+MSFT,Microsoft,US,USD,,4
+AMZN,Amazon.com,US,USD,,5
+AVGO,Broadcom,US,USD,,6
+META,Meta Platforms,US,USD,,7
+TSLA,Tesla,US,USD,,8
+WMT,Walmart,US,USD,,9
+BRK.B,Berkshire Hathaway (classe B),US,USD,,10
+JPM,JPMorgan Chase,US,USD,,11
+LLY,Eli Lilly,US,USD,,12
+XOM,Exxon Mobil,US,USD,,13
+V,Visa,US,USD,,14
+MU,Micron Technology,US,USD,,15
+AMD,Advanced Micro Devices,US,USD,,16
+JNJ,Johnson & Johnson,US,USD,,17
+INTC,Intel,US,USD,,18
+ORCL,Oracle,US,USD,,19
+COST,Costco Wholesale,US,USD,,20
+MA,Mastercard,US,USD,,21
+CAT,Caterpillar,US,USD,,22
+NFLX,Netflix,US,USD,,23
+CVX,Chevron,US,USD,,24
+BAC,Bank of America,US,USD,,25
+ABBV,AbbVie,US,USD,,26
+CSCO,Cisco Systems,US,USD,,27
+PG,Procter & Gamble,US,USD,,28
+KO,Coca-Cola,US,USD,,29
+UNH,UnitedHealth Group,US,USD,,30
+PLTR,Palantir Technologies,US,USD,,31
+HD,Home Depot,US,USD,,32
+LRCX,Lam Research,US,USD,,33
+AMAT,Applied Materials,US,USD,,34
+GE,GE Aerospace,US,USD,,35
+MS,Morgan Stanley,US,USD,,36
+GEV,GE Vernova,US,USD,,37
+GS,Goldman Sachs,US,USD,,38
+MRK,Merck & Co.,US,USD,,39
+PM,Philip Morris International,US,USD,,40
+TXN,Texas Instruments,US,USD,,41
+WFC,Wells Fargo,US,USD,,42
+RTX,RTX,US,USD,,43
+LIN,Linde,US,USD,,44
+KLAC,KLA,US,USD,,45
+AXP,American Express,US,USD,,46
+C,Citigroup,US,USD,,47
+ANET,Arista Networks,US,USD,,48
+IBM,IBM,US,USD,,49
+PEP,PepsiCo,US,USD,,50
