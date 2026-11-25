@@ -1,1 +1,2 @@
 date,ticker,id_position,instrument,sens,place,devise,quantite,multiplicateur,cours,date_cours,fx_eurusd,valeur_eur,exposition_eur,poids_pct,prix_revient_eur,pv_latente_eur,strategie
+2026-11-25,IWDA,IWDA|comptant,etf,long,Euronext Amsterdam,EUR,920.0,1.0,122.34,2026-11-25,,112552.8,112552.8,100.0,114632.0,-2079.2,indiciel

@@ -41,3 +41,9 @@ date,ticker,devise,ouverture,haut,bas,cloture,source,qualite
 2026-11-24,WPEA,EUR,6.94,6.94,6.81,6.83,sa.investing.com etfs/wpea-paris statut Closed date 24/11/2026 (2 decimales ; date tiree de la FAQ de la page) - releve 2026-11-24T22:55Z,web_horodate
 2026-11-20,CARMPAT,EUR,819.31,819.31,819.31,819.31,abcbourse.com opcvm FR0010135103 VL datee 20/11/2026 (concorde borsaitaliana 20/11/26) - releve 2026-11-24T22:55Z,web_horodate
 2026-11-23,CARMPAT,EUR,827.91,827.91,827.91,827.91,easybourse.com opcvm FR0010135103 VL datee 23/11/2026 (concorde carmignac.com Data as of Nov 23 2026) - releve 2026-11-24T22:55Z,web_horodate
+2026-11-24,IWDA,EUR,126.67,126.67,124.25,124.565,IBKR get_price_history conid 100292038 AEB ONE_DAY - releve 2026-11-25T22:42Z (differe 15 min) - correction de la cloture 124.58 relevee 2026-11-24T22:42Z,primaire
+2026-11-25,IWDA,EUR,124.6,124.99,121.96,122.34,IBKR get_price_history conid 100292038 AEB ONE_DAY - releve 2026-11-25T22:42Z (differe 15 min),primaire
+2026-11-25,EURUSD,USD,1.096425,1.099275,1.093125,1.097425,IBKR get_price_history conid 12087792 IDEALPRO ONE_DAY - releve 2026-11-25T22:42Z MidPoint; barre horodatee J-1 22:15Z = seance J,primaire
+2026-11-25,BRK-B,USD,576.75,581.47,573.28,579.32,IBKR get_price_history conid 72063691 SMART ONE_DAY - releve 2026-11-25T22:42Z (BRK B NYSE),primaire
+2026-11-25,ARKK,USD,64.6,67.73,62.68,67.36,IBKR get_price_history conid 172522644 SMART ONE_DAY - releve 2026-11-25T22:42Z,primaire
+2026-11-25,PSH,USD,49.6,49.86,48.54,48.7,IBKR get_price_history conid 170204225 LSE ONE_DAY - releve 2026-11-25T22:42Z ligne USD PSHD Londres (cotation Amsterdam introuvable au connecteur; differe 15 min),primaire
