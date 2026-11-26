@@ -47,3 +47,11 @@ date,ticker,devise,ouverture,haut,bas,cloture,source,qualite
 2026-11-25,BRK-B,USD,576.75,581.47,573.28,579.32,IBKR get_price_history conid 72063691 SMART ONE_DAY - releve 2026-11-25T22:42Z (BRK B NYSE),primaire
 2026-11-25,ARKK,USD,64.6,67.73,62.68,67.36,IBKR get_price_history conid 172522644 SMART ONE_DAY - releve 2026-11-25T22:42Z,primaire
 2026-11-25,PSH,USD,49.6,49.86,48.54,48.7,IBKR get_price_history conid 170204225 LSE ONE_DAY - releve 2026-11-25T22:42Z ligne USD PSHD Londres (cotation Amsterdam introuvable au connecteur; differe 15 min),primaire
+2026-11-25,IWDA,EUR,124.6,124.99,121.96,122.24,IBKR get_price_history conid 100292038 AEB ONE_DAY - releve 2026-11-26T22:45Z (differe 15 min) - correction de la cloture 122.34 relevee 2026-11-25T22:42Z,primaire
+2026-11-26,IWDA,EUR,125.31,126.03,125.3,125.82,IBKR get_price_history conid 100292038 AEB ONE_DAY - releve 2026-11-26T22:45Z (differe 15 min),primaire
+2026-11-26,EURUSD,USD,1.097525,1.098925,1.095725,1.0969,IBKR get_price_history conid 12087792 IDEALPRO ONE_DAY - releve 2026-11-26T22:45Z MidPoint; barre horodatee J-1 22:15Z = seance J,primaire
+2026-11-24,PSH,USD,49.76,50.16,48.84,49.72,IBKR get_price_history conid 170204225 LSE ONE_DAY - releve 2026-11-26T22:45Z ligne USD PSHD Londres (cotation Amsterdam introuvable au connecteur; differe 15 min) - correction du plus-haut 50.15 releve 2026-11-24T22:42Z,primaire
+2026-11-26,PSH,USD,50.26,50.6,50.1,50.6,IBKR get_price_history conid 170204225 LSE ONE_DAY - releve 2026-11-26T22:45Z ligne USD PSHD Londres (cotation Amsterdam introuvable au connecteur; differe 15 min),primaire
+2026-11-24,WPEA,EUR,6.941,6.942,6.811,6.829,boursedirect.fr page seance bloc Euronext MasterFile RawDATA TradingDate 24/11/2026 (3 decimales) - correction de la ligne investing.com 6.94/6.94/6.81/6.83 arrondie a 2 decimales - releve 2026-11-26T22:45Z,web_horodate
+2026-11-25,WPEA,EUR,,,,6.706,bourse.fortuneo.fr cloture 6.706 datee 25 novembre 17:35 (concorde borsaitaliana XPAR reference close 6.706 et boursedirect cloture veille) ; ouverture/haut/bas non releves - releve 2026-11-26T22:45Z,web_horodate
+2026-11-24,CARMPAT,EUR,830.72,830.72,830.72,830.72,abcbourse.com opcvm FR0010135103 VL 830.72 Date valorisation 24/11/2026 - releve 2026-11-26T22:45Z,web_horodate
