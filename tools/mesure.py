@@ -707,11 +707,22 @@ def benchmark(equity, prix, jusqua):
     return out
 
 
+# Instruments cotés au même calendrier que chaque véhicule : si l'un d'eux a une barre datée
+# du jour et pas le véhicule, sa place a coté et le cours manquant est un trou, pas un jour férié.
+# PSH (ligne de Londres) n'a aucun témoin de calendrier relevé : son report reste possible.
+CALENDRIER_INVESTISSEURS = {"BRK-B": ("ARKK",), "ARKK": ("BRK-B",),
+                            "CARMPAT": ("IWDA", "CW8", "WPEA"), "PSH": ()}
+trous_investisseurs = {}   # ticker -> [(date, date de la dernière clôture connue)]
+
+
 def benchmark_investisseurs(equity, prix):
     """EXPLORATOIRE, non pré-enregistré. Véhicules cotés d'investisseurs connus,
     120 000 € investis le premier jour, convertis en euros au change du jour.
-    Un véhicule absent de prices.csv est simplement absent : jamais approché."""
+    Un véhicule absent de prices.csv est simplement absent : jamais approché.
+    Un jour où sa place a coté sans cours relevé pour lui est un trou : sa dernière
+    clôture n'est pas reportée."""
     out = []
+    trous_investisseurs.clear()
     if not equity:
         return out
     for tk, (nom, vehicule) in FMT.INVESTISSEURS.items():
@@ -728,6 +739,9 @@ def benchmark_investisseurs(equity, prix):
             ds = ligne["date"]
             dd, bar = prix.derniere_cloture(tk, ds)
             if not bar or jour(dd) < jour(dates[0]):
+                continue
+            if jour(dd) < jour(ds) and any(prix.bar(t, ds) for t in CALENDRIER_INVESTISSEURS.get(tk, ())):
+                trous_investisseurs.setdefault(tk, []).append((ds, dd))
                 continue
             fx = prix.taux(ds) if dev == "USD" else 1.0
             out.append({"date": ds, "ticker": tk, "investisseur": nom, "vehicule": vehicule, "devise": dev,
@@ -1007,6 +1021,11 @@ def note_md(equity, bench, metrics, fills, evenements, jusqua):
             else:
                 L.append(f"| {nom} | {v:,.0f} € | {ec:+,.0f} € | {ecn:+,.0f} € | {q} |".replace(",", " "))
         L.append(f"| Livret A | {b['livret_a_eur']:,.0f} € | {b['ecart_vs_livret_eur']:+,.0f} € | — | taux réglementé |".replace(",", " "))
+        if trous_investisseurs:
+            L.append("")
+            L.append("Véhicules d'investisseurs (exploratoire) — **trous, dernière clôture non reportée** : "
+                     + " ; ".join(f"{tk} " + ", ".join(f"{d} (dernière clôture {dd})" for d, dd in v)
+                                  for tk, v in sorted(trous_investisseurs.items())) + ".")
         for cle in ("cw8", "wpea"):
             d = b.get(f"ecart_{cle}_vs_iwda_pct")
             if d not in (None, 0):
