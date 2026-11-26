@@ -4,3 +4,4 @@ date,horodatage_utc,ticker,id_position,instrument,sens,quantite,multiplicateur,d
 2026-11-25,2026-11-25T19:14:42Z,IWDA,,etf,long,920,1,EUR,124.58,124.58,Twelve Data clôture 2026-11-24 (aucun cours du 25 nov. obtenu à 19h08 UTC),,114613.60
 2026-11-26,2026-11-26T13:11:21Z,IWDA,,etf,long,920,1,EUR,124.60,125.795,IBKR contract_id 100292038 AEB dernier cours différé 2026-11-26 12:55 UTC,,115731.40
 2026-11-26,2026-11-26T16:10:09Z,IWDA,,etf,long,920,1,EUR,124.60,125.95,IBKR contract_id 100292038 AEB dernier cours différé 2026-11-26 15:54 UTC,,115874.00
+2026-11-26,2026-11-26T19:09:25Z,IWDA,,etf,long,920,1,EUR,124.60,125.675,IBKR contract_id 100292038 AEB dernier cours différé 2026-11-26 18:49 UTC,,115621.00
