@@ -9,3 +9,4 @@ horodatage_utc,id_decision,id_position,action,instrument,ticker,place,devise,sen
 2026-11-26T16:10:09Z,D-2026-11-26-02,,aucune,,,,,,,,,,,,,,,"D-2026-11-26-01 (41 IWDA, limite 127.00) en attente d'exécution à l'ouverture du 27 nov. ; aucun fait daté nouveau ne justifie de le modifier ni d'ajouter un ordre",,
 2026-11-26T19:09:25Z,D-2026-11-26-03,,aucune,,,,,,,,,,,,,,,"D-2026-11-26-01 (41 IWDA, limite 127.00) en attente d'exécution à l'ouverture du 27 nov. ; aucun fait daté nouveau ne justifie de le modifier ni d'ajouter un ordre",,
 2026-11-27T13:11:20Z,D-2026-11-27-01,,aucune,,,,,,,,,,,,,,,"Noyau complet (961 IWDA, D-2026-11-26-01 servi à 127.00), liquidités résiduelles 129.40 € ; aucune thèse satellite datée et chiffrée : rien à faire",,
+2026-11-27T16:10:30Z,D-2026-11-27-02,,aucune,,,,,,,,,,,,,,,"Noyau complet (961 IWDA) conforme à la charte, liquidités résiduelles 129.40 € ; aucun fait daté nouveau ni thèse satellite datée et chiffrée : rien à faire",,
